@@ -13,10 +13,49 @@ permissions:
   contents: read
 
 jobs:
+  bootstrap-lockfile:
+    name: Bootstrap Cargo.lock once
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup override set 1.98.0
+
+      - name: Commit resolved lockfile only when absent
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1; then
+            echo "Cargo.lock is already tracked; bootstrap write is unnecessary."
+            exit 0
+          fi
+
+          # `cargo generate-lockfile` resolves manifests only; this write-capable
+          # job deliberately does not build, test, run build scripts, or execute
+          # project binaries while holding a write token.
+          cargo generate-lockfile
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore(vg-03): commit verified Cargo.lock (#4)"
+          git push origin "HEAD:${HEAD_REF}"
+
   vg03-vg04:
     name: VG-03 / VG-04 Rust + PostgreSQL verification
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     env:
       POSTGRES_USER: postgres
@@ -65,19 +104,3 @@ jobs:
 
       - name: Unit and PostgreSQL integration tests
         run: cargo test --workspace --all-targets
-
-      # Temporary bootstrap evidence. Remove these steps after Cargo.lock is
-      # committed to the branch, then require --locked in CI.
-      - name: Print resolved Cargo.lock
-        run: |
-          echo '---CARGO-LOCK-BEGIN---'
-          cat Cargo.lock
-          echo '---CARGO-LOCK-END---'
-
-      - name: Upload bootstrap Cargo.lock
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: cargo-lock
-          path: Cargo.lock
-          retention-days: 1
-          if-no-files-found: error
