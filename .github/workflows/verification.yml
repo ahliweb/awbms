@@ -24,8 +24,8 @@ jobs:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_ci_password
       POSTGRES_DB: awbms
-      ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/awcms
-      AWBMS_TEST_DATABASE_URL: postgres://awbms_app_vg04:awbms_vg04_ci_password@127.0.0.1:5432/awcms
+      ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/awbms
+      AWBMS_TEST_DATABASE_URL: postgres://awbms_app_vg04:awbms_vg04_ci_password@127.0.0.1:5432/awbms
 
     services:
       postgres:
