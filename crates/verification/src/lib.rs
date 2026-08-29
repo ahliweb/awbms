@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 
-use std::time::Duration;
+use std::{future::Future, time::Duration};
 
 use axum::{Router, http::HeaderName, http::StatusCode, routing::get};
 use sqlx::{PgPool, Postgres, Transaction};
+use tokio::net::TcpListener;
 use tower_http::{
     limit::RequestBodyLimitLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
@@ -26,6 +27,18 @@ pub fn verification_router() -> Router {
         ))
         .layer(RequestBodyLimitLayer::new(REQUEST_BODY_LIMIT_BYTES))
         .layer(SetRequestIdLayer::new(request_id, MakeRequestUuid))
+}
+
+/// Runs the verification HTTP surface with explicit graceful-shutdown wiring.
+/// Production binaries may add richer cancellation coordination later, but the
+/// Stage-1 spike must prove the chosen Axum/Tokio lifecycle supports it cleanly.
+pub async fn serve_verification(
+    listener: TcpListener,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
+    axum::serve(listener, verification_router())
+        .with_graceful_shutdown(shutdown)
+        .await
 }
 
 /// Transaction wrapper used by the verification spike to prove that tenant
@@ -73,10 +86,13 @@ impl<'a> TenantTransaction<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use axum::{body::Body, http::Request};
+    use tokio::{net::TcpListener, sync::oneshot, time::timeout};
     use tower::ServiceExt;
 
-    use super::verification_router;
+    use super::{serve_verification, verification_router};
 
     #[tokio::test]
     async fn request_id_is_added_and_propagated() {
@@ -92,5 +108,27 @@ mod tests {
 
         assert_eq!(response.status(), axum::http::StatusCode::OK);
         assert!(response.headers().contains_key("x-request-id"));
+    }
+
+    #[tokio::test]
+    async fn graceful_shutdown_completes_without_aborting_the_server_task() {
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("verification listener must bind");
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+
+        let server = tokio::spawn(serve_verification(listener, async move {
+            let _ = shutdown_rx.await;
+        }));
+
+        shutdown_tx
+            .send(())
+            .expect("verification shutdown signal must be delivered");
+
+        timeout(Duration::from_secs(1), server)
+            .await
+            .expect("server must complete within the shutdown deadline")
+            .expect("server task must not panic")
+            .expect("graceful shutdown must complete successfully");
     }
 }
