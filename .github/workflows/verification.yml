@@ -53,6 +53,41 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Verify VG-15 repository independence
+        run: |
+          rustc --edition 2024 -D warnings --test tools/vg15_independence.rs -o /tmp/vg15-test
+          /tmp/vg15-test
+          rustc --edition 2024 -D warnings tools/vg15_independence.rs -o /tmp/vg15
+          /tmp/vg15 .
+
+      - name: Checkout pinned AWCMS source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms
+          ref: 11f2e95a47b1328a820f976d60f978c38a067903
+          path: .legacy/awcms
+          persist-credentials: false
+
+      - name: Checkout pinned AWCMS-Astro source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms-astro
+          ref: 7b753be619244541b817d5d8e7d3b72cfe88d4f9
+          path: .legacy/awcms-astro
+          persist-credentials: false
+
+      - name: Verify deterministic VG-01 static inventory generator
+        run: |
+          rustc --edition 2024 -D warnings --test tools/vg01_inventory.rs -o /tmp/vg01-test
+          /tmp/vg01-test
+          rustc --edition 2024 -D warnings tools/vg01_inventory.rs -o /tmp/vg01
+          /tmp/vg01 .legacy/awcms .legacy/awcms-astro /tmp/vg01-a
+          /tmp/vg01 .legacy/awcms .legacy/awcms-astro /tmp/vg01-b
+          diff -ru /tmp/vg01-a /tmp/vg01-b
+          grep -F '"count": 24' /tmp/vg01-a/modules.json
+          grep -F '"count": 148' /tmp/vg01-a/migrations.json
+          grep -F '"status": "partial-static-source-evidence"' /tmp/vg01-a/manifest.json
+
       - name: Verify committed dependency graph
         run: cargo metadata --locked --format-version 1 --no-deps >/dev/null
 
