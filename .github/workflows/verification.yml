@@ -66,10 +66,18 @@ jobs:
       - name: Unit and PostgreSQL integration tests
         run: cargo test --workspace --all-targets
 
-      # Temporary bootstrap evidence. Remove this step after Cargo.lock is
+      # Temporary bootstrap evidence. Remove these steps after Cargo.lock is
       # committed to the branch, then require --locked in CI.
       - name: Print resolved Cargo.lock
         run: |
           echo '---CARGO-LOCK-BEGIN---'
           cat Cargo.lock
           echo '---CARGO-LOCK-END---'
+
+      - name: Upload bootstrap Cargo.lock
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cargo-lock
+          path: Cargo.lock
+          retention-days: 1
+          if-no-files-found: error
