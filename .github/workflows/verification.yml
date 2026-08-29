@@ -1,0 +1,75 @@
+name: AWBMS verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: awbms-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  vg03-vg04:
+    name: VG-03 / VG-04 Rust + PostgreSQL verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_ci_password
+      POSTGRES_DB: awbms
+      ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/awbms
+      AWBMS_TEST_DATABASE_URL: postgres://awbms_app_vg04:awbms_vg04_ci_password@127.0.0.1:5432/awbms
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: awbms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d awbms"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.98.0
+          rustc --version
+          cargo --version
+
+      - name: Resolve bootstrap lockfile
+        run: cargo generate-lockfile
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Prepare least-privilege RLS fixture
+        run: psql "$ADMIN_DATABASE_URL" -f tests/fixtures/vg04_rls.sql
+
+      - name: Unit and PostgreSQL integration tests
+        run: cargo test --workspace --all-targets
+
+      # Temporary bootstrap evidence. Remove this step after Cargo.lock is
+      # committed to the branch, then require --locked in CI.
+      - name: Print resolved Cargo.lock
+        run: |
+          echo '---CARGO-LOCK-BEGIN---'
+          cat Cargo.lock
+          echo '---CARGO-LOCK-END---'
