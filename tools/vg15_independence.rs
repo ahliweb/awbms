@@ -30,7 +30,7 @@ fn scan(root: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     }
 
     let mut files = Vec::new();
-    collect_relevant(root, root, &mut files)?;
+    collect_relevant(root, root, &mut files, &mut violations)?;
     files.sort();
     for file in files {
         let text = match fs::read_to_string(&file) {
@@ -56,6 +56,7 @@ fn collect_relevant(
     root: &Path,
     current: &Path,
     out: &mut Vec<PathBuf>,
+    violations: &mut Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut entries: Vec<_> = fs::read_dir(current)?.filter_map(Result::ok).collect();
     entries.sort_by_key(|entry| entry.file_name());
@@ -69,16 +70,25 @@ fn collect_relevant(
             || relative.starts_with(".git/")
             || relative == ".legacy"
             || relative.starts_with(".legacy/")
+            || relative == "target"
             || relative.starts_with("target/")
+            || relative == "docs"
+            || relative.starts_with("docs/")
+            || relative == "contracts"
+            || relative.starts_with("contracts/")
         {
             continue;
         }
+
         let metadata = fs::symlink_metadata(&path)?;
         if metadata.file_type().is_symlink() {
+            violations.push(format!(
+                "{relative} is a symlink outside docs/contracts; source/build/deploy symlinks are forbidden unless the independence gate is explicitly redesigned"
+            ));
             continue;
         }
         if metadata.is_dir() {
-            collect_relevant(root, &path, out)?;
+            collect_relevant(root, &path, out, violations)?;
             continue;
         }
         if is_relevant_file(&relative) {
@@ -145,6 +155,17 @@ mod tests {
         let violations = scan(&root).unwrap();
         let _ = fs::remove_dir_all(&root);
         assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn rejects_source_symlink_escape() {
+        let root = temp_root("symlink");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("/tmp/awcms/src", root.join("crates/a/legacy")).unwrap();
+        let violations = scan(&root).unwrap();
+        let _ = fs::remove_dir_all(&root);
+        #[cfg(unix)]
+        assert!(violations.iter().any(|item| item.contains("symlink")));
     }
 
     #[test]
