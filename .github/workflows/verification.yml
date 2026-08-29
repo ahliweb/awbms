@@ -13,43 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  bootstrap-lockfile:
-    name: Bootstrap Cargo.lock once
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Install pinned Rust toolchain
-        run: |
-          rustup toolchain install 1.98.0 --profile minimal
-          rustup override set 1.98.0
-
-      - name: Commit resolved lockfile only when absent
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          if git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1; then
-            echo "Cargo.lock is already tracked; bootstrap write is unnecessary."
-            exit 0
-          fi
-
-          # `cargo generate-lockfile` resolves manifests only; this write-capable
-          # job deliberately does not build, test, run build scripts, or execute
-          # project binaries while holding a write token.
-          cargo generate-lockfile
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock
-          git commit -m "chore(vg-03): commit verified Cargo.lock (#4)"
-          git push origin "HEAD:${HEAD_REF}"
-
   vg03-vg04:
     name: VG-03 / VG-04 Rust + PostgreSQL verification
     runs-on: ubuntu-latest
@@ -90,17 +53,20 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Resolve bootstrap lockfile
-        run: cargo generate-lockfile
+      - name: Verify committed dependency graph
+        run: cargo metadata --locked --format-version 1 --no-deps >/dev/null
 
       - name: Formatting
         run: cargo fmt --all --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
       - name: Prepare least-privilege RLS fixture
         run: psql "$ADMIN_DATABASE_URL" -f tests/fixtures/vg04_rls.sql
 
       - name: Unit and PostgreSQL integration tests
-        run: cargo test --workspace --all-targets
+        run: cargo test --locked --workspace --all-targets
+
+      - name: Lockfile remains unchanged
+        run: git diff --exit-code -- Cargo.lock
