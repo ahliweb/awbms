@@ -1,10 +1,11 @@
 use std::{env, error::Error};
 
 use awbms_verification::TenantTransaction;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 
 #[tokio::test]
-async fn postgres_force_rls_is_real_and_tenant_context_does_not_leak() -> Result<(), Box<dyn Error>> {
+async fn postgres_force_rls_is_real_and_tenant_context_does_not_leak() -> Result<(), Box<dyn Error>>
+{
     let database_url = match env::var("AWBMS_TEST_DATABASE_URL") {
         Ok(value) => value,
         Err(_) => {
@@ -21,11 +22,10 @@ async fn postgres_force_rls_is_real_and_tenant_context_does_not_leak() -> Result
 
     assert_app_role_is_least_privilege(&pool).await?;
 
-    let visible_without_context: Vec<String> = sqlx::query_scalar(
-        "SELECT tenant_id FROM awbms_vg04_probe ORDER BY tenant_id",
-    )
-    .fetch_all(&pool)
-    .await?;
+    let visible_without_context: Vec<String> =
+        sqlx::query_scalar("SELECT tenant_id FROM awbms_vg04_probe ORDER BY tenant_id")
+            .fetch_all(&pool)
+            .await?;
     assert!(
         visible_without_context.is_empty(),
         "missing tenant context must fail closed"
@@ -47,11 +47,10 @@ async fn postgres_force_rls_is_real_and_tenant_context_does_not_leak() -> Result
 
     tenant_a.rollback().await?;
 
-    let visible_after_rollback: Vec<String> = sqlx::query_scalar(
-        "SELECT tenant_id FROM awbms_vg04_probe ORDER BY tenant_id",
-    )
-    .fetch_all(&pool)
-    .await?;
+    let visible_after_rollback: Vec<String> =
+        sqlx::query_scalar("SELECT tenant_id FROM awbms_vg04_probe ORDER BY tenant_id")
+            .fetch_all(&pool)
+            .await?;
     assert!(
         visible_after_rollback.is_empty(),
         "SET LOCAL tenant context must not leak back into the pool"
@@ -65,11 +64,10 @@ async fn postgres_force_rls_is_real_and_tenant_context_does_not_leak() -> Result
 }
 
 async fn assert_app_role_is_least_privilege(pool: &PgPool) -> Result<(), sqlx::Error> {
-    let (is_superuser, bypasses_rls): (bool, bool) = sqlx::query_as(
-        "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user",
-    )
-    .fetch_one(pool)
-    .await?;
+    let (is_superuser, bypasses_rls): (bool, bool) =
+        sqlx::query_as("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
+            .fetch_one(pool)
+            .await?;
 
     assert!(!is_superuser, "application role must not be superuser");
     assert!(!bypasses_rls, "application role must not BYPASSRLS");
@@ -80,7 +78,10 @@ async fn assert_app_role_is_least_privilege(pool: &PgPool) -> Result<(), sqlx::E
     .fetch_one(pool)
     .await?;
 
-    assert!(!is_table_owner, "application role must not own business tables");
+    assert!(
+        !is_table_owner,
+        "application role must not own business tables"
+    );
 
     Ok(())
 }
