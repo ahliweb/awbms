@@ -43,6 +43,22 @@
       "purpose": "backend-consumer-contract-source"
     },
     {
+      "repository": "ahliweb/awcms",
+      "path": "openapi/awcms-public-api.openapi.yaml",
+      "gitBlobSha": "5383a3affefedd8cfbf8d313729f928f808999b0",
+      "sha256": null,
+      "status": "observed-not-yet-frozen",
+      "purpose": "bundled-public-openapi-contract"
+    },
+    {
+      "repository": "ahliweb/awcms",
+      "path": "asyncapi/awcms-domain-events.asyncapi.yaml",
+      "gitBlobSha": "a8c2d890809458663ad181f148346d630a99f912",
+      "sha256": null,
+      "status": "observed-not-yet-frozen",
+      "purpose": "domain-event-asyncapi-contract"
+    },
+    {
       "repository": "ahliweb/awcms-astro",
       "path": "tests/kontrak-awcms.test.mjs",
       "gitBlobSha": "f27f77e5b3962815c09ec3bf1a89abf8fb5baba5",
@@ -77,8 +93,8 @@
     {"id": "tables-rls", "status": "pending"},
     {"id": "live-roles-grants", "status": "pending"},
     {"id": "routes-auth-ownership", "status": "pending"},
-    {"id": "openapi", "status": "pending"},
-    {"id": "asyncapi", "status": "pending"},
+    {"id": "openapi", "status": "source-pinned-pending-freeze"},
+    {"id": "asyncapi", "status": "source-pinned-pending-freeze"},
     {"id": "architectural-gates", "status": "pending"},
     {"id": "authorization-vectors", "status": "pending"},
     {"id": "astro-consumer-contract", "status": "pending-freeze"},
