@@ -1,34 +1,91 @@
 # AWBMS Rust Backend Architecture Validation
 
-**Project:** AWBMS — AhliWeb Backend Management System  
-**Repository:** `ahliweb/awbms`  
-**Status:** Architecture validation / pre-Master-Blueprint  
-**Validated:** 2026-08-29  
-**Decision scope:** Fully Rust-based backend architecture, ecosystem, scalability, maintainability, security, compatibility, and migration strategy.
+| Field | Value |
+|---|---|
+| Project | AWBMS — AhliWeb Backend Management System |
+| Repository | `ahliweb/awbms` |
+| Document version | 1.1 |
+| Status | Architecture validation — **conditionally approved** to enter Stage 1 (see [§49](#49-master-blueprint-entry-conditions) and [Appendix F](#appendix-f--approval-record)) |
+| Original validation date | 2026-08-29 |
+| Last revision | 2026-08-29 (rigor/traceability revision; no architectural decision reversed) |
+| Evidence basis | This repository at commit `5f8f9aa` + external claims recorded by the original validation (not re-verified here) |
+| Decision scope | Rust-based backend architecture, ecosystem selection, scalability, maintainability, security, AWCMS compatibility, migration strategy |
+| Explicitly out of scope | Product requirements, UX, pricing/commercial strategy, org/staffing, per-module functional design, SLO target values |
+| Owner / approver | *unassigned — see [Appendix F](#appendix-f--approval-record)* |
+| Review cadence | Re-validate at the start of each major migration or specification stage, and whenever any gate in [Appendix E](#appendix-e--verification-gate-register) changes state |
+
+---
+
+## 0. How to read this document
+
+### 0.1 Repository state (verified)
+
+**[F]** At commit `5f8f9aa` the `ahliweb/awbms` repository contains exactly one tracked file — this document. There is no Rust code, no `Cargo.toml`, `Cargo.lock` or `rust-toolchain.toml`, no `migrations/`, no `contracts/` directory, no git submodule and no CI configuration.
+
+Two consequences follow, and they govern the whole document:
+
+1. **Nothing in this document describes implemented behavior.** Every architectural statement is a *proposal* for work not yet started. No benchmark has been run, no test suite exists, no dependency version has been resolved by a build.
+2. **Claims about systems outside this repository cannot be verified from it.** The AWCMS facts in [§2](#2-source-of-truth-review) and the Rust release fact in [§4.1](#41-recommended-baseline) were asserted by the original validation. They are preserved verbatim as *recorded claims*, each carrying a verification gate. They are not treated as established facts.
+
+### 0.2 Claim labels
+
+Statements are labelled where their epistemic status matters. Unlabelled prose in [§4](#4-rust-ecosystem-validation)–[§56](#56-monitoring-baseline) is design recommendation, equivalent to **[R]**.
+
+| Label | Meaning | Register |
+|---|---|---|
+| **[F]** | Verified fact — checked against this repository at the stated commit | — |
+| **[C]** | Recorded external claim — asserted by the original validation, **not** verified here; carries a gate | [Appendix A](#appendix-a--recorded-external-claims) |
+| **[A]** | Assumption — relied upon, not established; falsification changes the design | [Appendix B](#appendix-b--assumption-register) |
+| **[D]** | Decision — binding unless superseded by a recorded successor decision | [Appendix C](#appendix-c--decision-register) |
+| **[R]** | Recommendation — a default that a team may override by recording a new decision | — |
+| **[O]** | Open decision — deliberately unresolved; must close before the stage named in the register | [Appendix D](#appendix-d--open-decision-register) |
+| **[G]** | Verification gate — the executable or documentary evidence that discharges a claim or decision | [Appendix E](#appendix-e--verification-gate-register) |
+
+### 0.3 Normative language
+
+`MUST`, `MUST NOT`, `SHALL` and `MUST` in capitals carry RFC 2119 / RFC 8174 force. Lowercase "should", "must" and "may" in the discussion sections are ordinary prose and carry **no** normative force — normative force lives in the decision register ([Appendix C](#appendix-c--decision-register)) and the gate register ([Appendix E](#appendix-e--verification-gate-register)). This split is deliberate: it keeps the discussion readable while making the binding surface small enough to review and audit.
+
+### 0.4 Validation status at a glance
+
+| Category | Count | Where |
+|---|---:|---|
+| Facts verified against this repository | 3 | [§0.1](#01-repository-state-verified), [§3.1](#31-current-state-verified) |
+| Recorded external claims awaiting verification | See Appendix A | [Appendix A](#appendix-a--recorded-external-claims) |
+| Assumptions | See Appendix B | [Appendix B](#appendix-b--assumption-register) |
+| Binding decisions | See Appendix C | [Appendix C](#appendix-c--decision-register) |
+| Open decisions blocking the Blueprint | See Appendix D | [Appendix D](#appendix-d--open-decision-register) |
+| Verification gates | See Appendix E | [Appendix E](#appendix-e--verification-gate-register) |
+
+**What this validation does and does not establish.** It establishes that a coherent, internally consistent Rust architecture *can* be specified for AWBMS, and it records the trade-off reasoning for each major selection. It does **not** establish that the selected crates meet AWBMS requirements under load, that AWCMS behavior has been inventoried, or that migration is feasible on any particular schedule. Those are the open items in Appendices A, D and E.
 
 ---
 
 ## 1. Executive decision
 
-AWBMS should be developed as a **new, independent Rust-native backend platform**, not as a source-code translation of AWCMS.
+**[D]** AWBMS is to be developed as a **new, independent Rust-native backend platform**, not as a source-code translation of AWCMS (`AD-01`).
 
-The recommended target architecture is:
+The recommended target architecture is summarised below. Each line is binding as the referenced decision; full context, rationale and consequences are in [Appendix C](#appendix-c--decision-register).
 
-- **Rust 2024 Edition** as the backend implementation language.
-- **Axum + Tower + Tokio** as the HTTP/runtime foundation.
-- **PostgreSQL** as the authoritative system of record.
-- **SQLx** as the primary PostgreSQL data-access layer.
-- **Modular monolith** as the initial architecture.
-- **RBAC + ABAC + Separation of Duties + PostgreSQL FORCE RLS** as the authorization model.
-- **Opaque server-side sessions** for human users.
-- **Transactional PostgreSQL outbox** for domain events and reliable asynchronous delivery.
-- **PostgreSQL-backed job queues** with horizontally scalable Rust workers.
-- **OpenAPI and AsyncAPI contract-first** interfaces.
-- **Rust-native observability** using `tracing` and OpenTelemetry/OTLP.
-- **Redis/Valkey optional**, never an initial correctness dependency.
-- **Cloudflare R2 through a storage abstraction**, not through domain-level provider coupling.
-- **Docker + Coolify + Traefik + Cloudflare** for deployment and edge infrastructure.
-- A separate **AWCMS compatibility layer and parity test suite** for migration, without runtime/source dependency on the old repository.
+| Element | Decision |
+|---|---|
+| **Rust 2024 Edition**, pinned stable toolchain | `AD-02` |
+| **Tokio** async runtime | `AD-03` |
+| **Axum + Tower** HTTP foundation | `AD-04` |
+| **PostgreSQL** as the authoritative system of record | `AD-05` |
+| **SQLx** as the primary PostgreSQL data-access layer | `AD-06` |
+| **Modular monolith**, microservice-extractable | `AD-07` |
+| **RBAC + ABAC + Separation of Duties + PostgreSQL FORCE RLS** | `AD-10` |
+| **Opaque server-side sessions** for human users | `AD-11` |
+| **Transactional PostgreSQL outbox** for domain events | `AD-13` |
+| **PostgreSQL-backed job queues** with horizontally scalable Rust workers | `AD-14` |
+| **OpenAPI and AsyncAPI contract-first** interfaces | `AD-19` |
+| **`tracing` + OpenTelemetry/OTLP** observability | `AD-20` |
+| **Redis/Valkey optional**, never an initial correctness dependency | `AD-18` |
+| **Cloudflare R2 behind a storage port**, not domain-level provider coupling | `AD-17` |
+| **Docker + Coolify + Traefik + Cloudflare** deployment and edge | `AD-30` |
+| **AWCMS compatibility layer + parity suite**, no source/runtime dependency on the old repository | `AD-24` |
+
+**Confidence and basis.** These selections rest on documented ecosystem characteristics and on the architectural fit reasoning in [§5](#5-http-framework-decision-axum), [§6](#6-database-access-decision-sqlx) and [§8](#8-modular-monolith-decision). They do **not** rest on any AWBMS measurement — no prototype, benchmark or load test has been run ([§0.1](#01-repository-state-verified)). `AD-04` and `AD-06` are the two selections most exposed to that gap and are gated by `VG-04`.
 
 The architectural principle is:
 
@@ -40,14 +97,11 @@ AWBMS is therefore **not “AWCMS rewritten line-by-line in Rust.”** It is a n
 
 ## 2. Source-of-truth review
 
-This validation reviewed the latest available state of:
+> **Status of this section.** Everything below was observed by the original validation against the external repositories `ahliweb/awcms` and `ahliweb/awcms-astro`. **None of it is verifiable from `ahliweb/awbms`**, which contains no AWCMS fixtures ([§0.1](#01-repository-state-verified)). The observations are preserved verbatim as recorded claims `C-01`–`C-05` so that a later reader can re-check them rather than inherit them. Treat this section as *the input to* `VG-01`, not as its output.
 
-- `ahliweb/awcms`
-- `ahliweb/awcms-astro`
+**[C]** `C-01` — the state reviewed was `ahliweb/awcms` at release `v10.1.0`, commit `11f2e95a47b1328a820f976d60f978c38a067903` dated 2026-08-28, together with `ahliweb/awcms-astro`. No commit reference was recorded for `awcms-astro`; that omission is itself a gap, since the consumer contract surface in [§39](#39-awcms--awbms-parity-harness) depends on it.
 
-At the validation point, the latest observed AWCMS release state was `v10.1.0`, with commit `11f2e95a47b1328a820f976d60f978c38a067903` dated 2026-08-28.
-
-The current AWCMS implementation contains **24 registered modules**:
+**[C]** `C-02` — the AWCMS implementation contains **24 registered modules**:
 
 1. `logging`
 2. `tenant_admin`
@@ -74,9 +128,11 @@ The current AWCMS implementation contains **24 registered modules**:
 23. `idn_admin_regions`
 24. `push_delivery`
 
-The architecture documentation reports migrations through `sql/148`, PostgreSQL `FORCE ROW LEVEL SECURITY` for tenant-scoped tables, separated database roles, module composition rules, OpenAPI/AsyncAPI contracts, audit/event systems, and a read/write SYSTEM administration surface.
+**[C]** `C-03` — the AWCMS *architecture documentation* reports migrations through `sql/148`, PostgreSQL `FORCE ROW LEVEL SECURITY` for tenant-scoped tables, separated database roles, module composition rules, OpenAPI/AsyncAPI contracts, audit/event systems, and a read/write SYSTEM administration surface.
 
-AWCMS also contains extensive machine-enforced architectural gates, including checks for:
+> **Known contradiction — do not propagate `C-03` uncritically.** `C-03` is sourced from AWCMS prose, and [§2.1](#21-documentation-drift-warning) states that AWCMS prose is known to lag the implementation and must be outranked by the registry, migrations and executable tests. The migration count `sql/148` is therefore a *documentation* figure of unknown accuracy, not a verified schema state. `VG-01` MUST re-derive it from the migration directory and ledger table rather than from prose. The same caution applies to the capability descriptions in `C-03`; `C-02`'s module list, by contrast, was reported from the registry and is more likely to hold, but is gated identically.
+
+**[C]** `C-04` — AWCMS contains machine-enforced architectural gates, including checks for:
 
 - module DAG integrity;
 - route ownership;
@@ -95,25 +151,52 @@ AWCMS also contains extensive machine-enforced architectural gates, including ch
 - dependency/security readiness;
 - documentation and generated-artifact drift.
 
-These are important because the strongest AWCMS assets are not merely its features; they are the **invariants and regression gates that were created after real engineering failures were discovered**.
+**[C]** `C-05` — these gates were created in response to engineering failures found in production or review, and therefore encode invariants that a feature list does not capture.
 
-AWBMS should adopt the proven invariants while implementing them with Rust-native mechanisms.
+`C-05` carries the strategic weight of this whole section: it is the reason AWBMS treats AWCMS as a *requirements source* rather than a codebase to translate (`AD-01`). If `C-05` proves overstated — if the gates are aspirational rather than enforced — then the AWCMS invariant set is weaker evidence than assumed, and the AWBMS gate design in [§28](#28-maintainability-and-code-quality-gates) must be re-derived from threat modelling instead of inheritance. `VG-01` MUST therefore record, for each listed gate, whether it is *enforced in CI*, *advisory*, or *absent*.
+
+**[D]** AWBMS adopts the proven invariants while implementing them with Rust-native mechanisms (`AD-01`, and the gate set in [§28](#28-maintainability-and-code-quality-gates)). The mapping from AWCMS invariant to AWBMS control is in [Appendix G](#appendix-g--awcms-invariant-traceability).
 
 ### 2.1 Documentation drift warning
 
-The AWCMS architecture prose still contains historical sections whose counts or capability descriptions lag the actual module registry. Therefore:
+**[C]** `C-03` (above) illustrates the problem: the AWCMS architecture prose contains historical sections whose counts and capability descriptions lag the actual module registry. Therefore:
 
-> **The current implementation registry, migrations, contracts, executable tests, and generated inventories SHALL outrank stale prose during AWBMS requirements extraction.**
+> **The current implementation registry, migrations, contracts, executable tests, and generated inventories SHALL outrank prose during AWBMS requirements extraction.**
 
-Before migration work begins, AWBMS must generate and freeze a machine-verifiable AWCMS source inventory.
+This document is subject to the same rule it imposes. Its own §2 is prose, and [Appendix A](#appendix-a--recorded-external-claims) exists so that its claims expire rather than harden.
+
+### 2.2 Required AWCMS source inventory (`VG-01`)
+
+Before migration work begins, AWBMS MUST generate and freeze a machine-verifiable AWCMS source inventory. Prose summaries do not discharge this gate. The inventory MUST be produced by a re-runnable script committed to `ahliweb/awbms`, MUST record the AWCMS commit SHA it was generated from, and MUST contain at minimum:
+
+| Inventory item | Derived from (not from prose) | Supersedes |
+|---|---|---|
+| Module registry: key, kind, dependencies, capabilities | the registry source file | `C-02` |
+| Applied migration list with per-file SHA-256 and ledger state | `migrations/` + migration history table | `C-03` |
+| Tables with RLS and `FORCE ROW LEVEL SECURITY` enabled | live `pg_class` / `pg_policy` introspection | `C-03` |
+| Database roles and grants | live `information_schema` introspection | `C-03` |
+| Route inventory with owning module and auth requirement | router source or generated route table | `C-03` |
+| OpenAPI + AsyncAPI documents | contract files as committed | `C-03` |
+| Architectural gate list, each marked enforced / advisory / absent | CI configuration + gate scripts | `C-04`, `C-05` |
+| Authorization vectors (principal × resource × expected decision) | executable authorization tests | — |
+
+Each artifact MUST be stored under `contracts/legacy/awcms/` with the provenance fields required by [§3](#3-repository-independence). Once frozen, the inventory — not this section — is the requirements baseline.
 
 ---
 
 ## 3. Repository independence
 
-`ahliweb/awbms` is a separate product repository.
+`ahliweb/awbms` is a separate product repository (`AD-24`).
 
-It must not introduce source or runtime dependencies such as:
+### 3.1 Current state (verified)
+
+**[F]** At commit `5f8f9aa` this repository has **no** dependency on AWCMS of any kind: no git submodule, no `.gitmodules`, no Cargo manifest and therefore no path or git dependency, and no vendored AWCMS source. Independence is currently a fact, not merely an intention — the gate `VG-15` exists to keep it one once a build is introduced.
+
+**[F]** Equally, `contracts/legacy/awcms/` does not yet exist. The fixture pipeline described below is entirely prospective.
+
+### 3.2 Prohibited couplings
+
+AWBMS MUST NOT introduce source or runtime dependencies such as:
 
 ```text
 ../awcms
@@ -123,7 +206,7 @@ runtime import from awcms
 shared production filesystem coupling
 ```
 
-Instead, compatibility artifacts should be imported as versioned fixtures:
+Instead, compatibility artifacts MUST be imported as versioned, frozen fixtures:
 
 ```text
 AWCMS
@@ -142,23 +225,28 @@ contracts/legacy/awcms/
 AWBMS compatibility + parity tests
 ```
 
-Every imported legacy artifact should record:
+Every imported legacy artifact MUST record:
 
 - source repository;
 - source commit SHA;
 - import date;
 - SHA-256 digest;
-- contract/schema version where available.
+- contract/schema version where available;
+- the AWBMS parity test(s) that consume it, so an unused fixture is detectable.
 
-This makes compatibility reproducible without turning AWCMS into a build dependency.
+This makes compatibility reproducible without turning AWCMS into a build dependency. The provenance fields are what let a future reader distinguish "AWBMS matches AWCMS" from "AWBMS matches an undated snapshot of AWCMS."
 
 ---
 
 ## 4. Rust ecosystem validation
 
-The Rust backend ecosystem is sufficiently mature for AWBMS.
+**[R]** The Rust backend ecosystem is judged sufficiently mature for AWBMS.
+
+The basis for that judgement is qualitative: the crates below are widely deployed, actively maintained, and cover every capability AWBMS needs without requiring a bespoke implementation of transport, TLS, or database protocol. The judgement is *not* based on any AWBMS-specific evaluation, prototype or measurement ([§0.1](#01-repository-state-verified)). Maturity in general does not imply fitness for this workload; `VG-04` converts the judgement into evidence before the Blueprint freezes the stack.
 
 ### 4.1 Recommended baseline
+
+**[R]** — no version numbers are pinned here deliberately. Concrete versions belong in `Cargo.toml`, `Cargo.lock` and `rust-toolchain.toml`, which are the only artifacts that can be verified by a build. A version table duplicated into prose is a drift source, and [§2.1](#21-documentation-drift-warning) forbids exactly that pattern.
 
 | Concern | Recommendation |
 |---|---|
@@ -184,21 +272,23 @@ The Rust backend ecosystem is sufficiently mature for AWBMS.
 | CLI | `clap` |
 | Dependency security | RustSec, cargo-audit, cargo-deny, cargo-vet |
 
-At the validation date, Rust stable `1.98.0` had been released on 2026-08-20. Tokio, Axum, SQLx, Tower, Reqwest, Serde, rustls, OpenTelemetry and other required ecosystem components are mature enough for production use.
+**[C]** `C-06` — the original validation recorded that Rust stable `1.98.0` had been released on 2026-08-20, and that Tokio, Axum, SQLx, Tower, Reqwest, Serde, rustls and OpenTelemetry were production-ready at that date. This is an external, time-sensitive claim; it is not verifiable from this repository and it decays with every release cycle. It MUST NOT be copied into the Blueprint. Resolve the actual toolchain version at bootstrap time (`VG-03`) and record it in `rust-toolchain.toml`, which then becomes the single source of truth.
 
-AWBMS should pin toolchain and critical dependencies rather than automatically chase every newest minor release.
+**[D]** AWBMS pins the toolchain and critical dependencies rather than tracking latest releases (`AD-02`, `AD-22`).
 
-### 4.2 Runtime policy
+### 4.2 Runtime and upgrade policy
 
-Recommended initial policy:
+**[R]** Initial policy:
 
 ```text
-Rust          : pinned stable toolchain
+Rust          : pinned stable toolchain, recorded in rust-toolchain.toml
 Edition       : 2024
-Tokio         : supported/LTS line where practical
+Tokio         : single pinned minor line per release train
 ```
 
-Dependency upgrades should pass:
+> **[O] `OD-02`** — "supported/LTS line where practical", as originally written, is not an actionable policy: it names no cadence, no owner and no upgrade trigger. `OD-02` MUST define the pin granularity, the routine upgrade cadence, and the expedited path for a RustSec advisory, before CI is established (step 2 of [§51](#51-initial-implementation-sequence-after-definition-of-ready)).
+
+Dependency upgrades MUST pass:
 
 1. compile/type checks;
 2. unit and integration tests;
@@ -216,9 +306,11 @@ Dependency upgrades should pass:
 - Axum
 - Actix Web
 
-Both are viable production frameworks.
+Both are viable production frameworks. Neither was disqualified on capability grounds.
 
 ### 5.2 Decision matrix
+
+> **Scale definition.** Ratings are **reviewer judgement recorded at validation time, not measurements**. They mean: *Excellent* = directly supported, idiomatic, no adaptation needed; *Very good* = supported with minor adaptation; *Good* = supported with a documented workaround or companion crate; *Moderate/Possible* = achievable but against the grain. No rating in this document derives from a benchmark, and the ratings are not weighted or summed — the decision rests on the architectural argument in [§5.3](#53-decision), with the matrix as supporting context. Ratings that would change the outcome if wrong are gated by `VG-04`.
 
 | Criterion | Axum | Actix Web | AWBMS decision |
 |---|---:|---:|---|
@@ -267,6 +359,8 @@ Raw HTTP benchmark differences are not an adequate reason to optimize away from 
 - SeaORM
 
 ### 6.2 Decision matrix
+
+> **Scale definition** as in [§5.2](#52-decision-matrix); ratings are reviewer judgement, not measurement. Two rows are known to be sensitive to how the criterion is read and MUST be re-checked against current upstream documentation under `VG-04` before `AD-06` is frozen: *Native async model* (the candidates differ in whether async is provided by the core crate or a companion crate, which materially changes the integration story) and *Compile-time query checks* (the three candidates verify different things — query text against a live schema, versus schema-derived types — so a single ordinal rating flattens a real distinction).
 
 | Requirement | SQLx | Diesel | SeaORM |
 |---|---:|---:|---:|
@@ -1029,7 +1123,9 @@ Raw passwords, access tokens, refresh tokens, MFA secrets, recovery codes, API k
 
 ## 23. Performance expectations
 
-Rust should improve the platform's potential for:
+> **[F] No performance data exists.** No AWBMS benchmark has been designed or run, and no AWCMS baseline measurement is recorded anywhere in this repository. This section states *expectations and a measurement plan only*. No number in it may be quoted as a result, and the Blueprint MUST NOT carry a performance commitment that is not backed by `VG-09` output. Comparative statements about AWCMS are meaningless until a baseline exists on identical infrastructure.
+
+**[R]** Rust is expected to improve the platform's potential for:
 
 - lower memory overhead;
 - efficient CPU use;
@@ -1086,9 +1182,11 @@ job throughput
 error rate
 ```
 
-Use identical infrastructure, dataset and workload when comparing AWCMS and AWBMS.
+Use identical infrastructure, dataset and workload when comparing AWCMS and AWBMS. A comparison that varies infrastructure alongside implementation measures nothing.
 
-Correctness/security parity comes before performance optimization.
+**[O] `OD-04`** — no acceptance threshold is defined for any metric above. "Benchmark improves a defined metric" ([§48](#48-performance-validation-gates)) is unenforceable until targets exist. The Blueprint MUST set, per benchmark scenario, an explicit SLO or a "baseline-only, no regression beyond X%" rule. Until then `VG-09` verifies only that measurements were *taken*, not that they were *acceptable*.
+
+Correctness and security parity come before performance optimization; a faster implementation that fails `VG-05` or `VG-12` is not a candidate for cutover.
 
 ---
 
@@ -1329,7 +1427,7 @@ The algorithm should define:
 
 Rate limiting must target the resource being abused, not only the requester identity/IP.
 
-The recent AWCMS newsletter hardening is a useful example: per-IP limits alone could not prevent repeated email delivery to a victim address, so recipient-oriented cooldown semantics were required.
+**[C]** `C-07` — AWCMS newsletter hardening is the motivating example: per-IP limits alone could not prevent repeated email delivery to a victim address, so recipient-oriented cooldown semantics were required. (Recorded as reported by the original validation; the AWCMS change is not identified by commit or date here, so `VG-01` MUST capture the resulting rate-limit dimensions from the AWCMS implementation rather than from this paragraph. The word "recent" was removed as unmaintainable — it silently ages.)
 
 AWBMS rate/abuse controls may need dimensions such as:
 
@@ -1454,7 +1552,9 @@ Once migration and compatibility windows are complete, it can be deprecated inde
 
 ## 37. Database migration strategy
 
-Because AWBMS is a separate product, two migration modes are valid.
+Because AWBMS is a separate product, more than one migration mode is defensible. This section describes three; [§37.3](#373-preferred-long-term-approach) is preferred.
+
+> **[O] `OD-01` — the choice is open and it is consequential.** The three modes below are *not* interchangeable: §37.1 forces schema-name compatibility and expand-contract coexistence ([§40.1](#401-expand-contract-rule)) onto every migration, §37.2 forgoes coexistence on one database entirely, and §37.3 requires a reconciliation pipeline that neither of the others needs. Sequencing, rollback design ([§42](#42-rollback-model)) and the parity harness scope ([§39](#39-awcms--awbms-parity-harness)) all depend on which is chosen. `OD-01` MUST be closed in the Master Blueprint, per deployment, with the choice and its rationale recorded as a successor decision to `AD-27`. Do not begin migration engineering while all three remain open.
 
 ### 37.1 Existing AWCMS production database takeover
 
@@ -1597,7 +1697,7 @@ Never drop a field/table that the old implementation may still require.
 
 ## 41. Worker cutover safety
 
-Bun/AWCMS and Rust/AWBMS workers must never accidentally consume the same production queue/job simultaneously.
+The incumbent AWCMS workers and the new Rust/AWBMS workers MUST never concurrently consume the same production queue or job. (AWCMS is assumed to run on a TypeScript/Bun runtime — `AS-01`; the cutover protocol below does not depend on which runtime it is, only on there being exactly one owner at a time.)
 
 For each worker class:
 
@@ -1845,7 +1945,26 @@ Optimize SQL/indexes and transaction boundaries before introducing architectural
 
 ## 49. Master Blueprint entry conditions
 
-The architecture is considered sufficiently validated to enter Stage 1 — Master Blueprint.
+The architecture is considered sufficiently validated to enter Stage 1 — Master Blueprint — **conditionally**. The conditions are stated here rather than left implicit, because "validated" in the original document was not distinguishable from "approved without preconditions".
+
+### 49.1 Entry conditions
+
+Stage 1 may **begin** immediately: Blueprint authoring is itself the work that closes most open decisions.
+
+Stage 1 may **not complete** — the Blueprint may not be signed off — until:
+
+| # | Condition | Reference |
+|---|---|---|
+| 1 | `VG-01` discharged: the frozen, machine-generated AWCMS inventory exists in `contracts/legacy/awcms/`, superseding claims `C-01`–`C-05` and `C-07` | [§2.2](#22-required-awcms-source-inventory-vg-01) |
+| 2 | Every Blueprint-blocking open decision in [Appendix D](#appendix-d--open-decision-register) is closed and recorded as a decision | [Appendix D](#appendix-d--open-decision-register) |
+| 3 | Every assumption in [Appendix B](#appendix-b--assumption-register) is confirmed, or the dependent decision is revisited | [Appendix B](#appendix-b--assumption-register) |
+| 4 | `VG-03` and `VG-04` discharged: toolchain resolved and pinned; the `AD-04` / `AD-06` sensitivity checks completed | [§4.2](#42-runtime-and-upgrade-policy), [§6.2](#62-decision-matrix) |
+| 5 | `C-06` removed rather than carried forward; versions live only in build manifests | [§4.1](#41-recommended-baseline) |
+| 6 | AWBMS v1 module scope defined — `OD-09`; the 24 AWCMS modules of `C-02` are an inventory, not a v1 commitment | [§2](#2-source-of-truth-review) |
+
+If condition 1 falsifies a material claim — for example if the AWCMS gates of `C-04`/`C-05` prove advisory rather than enforced — this validation MUST be revised before the Blueprint proceeds, not patched inside it.
+
+### 49.2 Blueprint contents
 
 The Blueprint must formalize:
 
@@ -2104,37 +2223,19 @@ Monitor at least:
 
 ## 57. Architecture decision summary
 
-| Decision | Result |
-|---|---|
-| Repository | `ahliweb/awbms`, fully independent |
-| Backend language | Rust |
-| Runtime | Tokio |
-| HTTP | Axum + Tower |
-| Database | PostgreSQL |
-| DB library | SQLx |
-| Architecture | Modular monolith |
-| Distributed services | Not initial default |
-| Human sessions | Opaque, server-side |
-| Authorization | RBAC + ABAC + SoD + FORCE RLS |
-| Events | PostgreSQL transactional outbox |
-| Jobs | PostgreSQL queue + Rust worker |
-| Cache | Local first; Redis/Valkey optional |
-| Object storage | Provider abstraction, R2 adapter |
-| OpenAPI | Contract-first |
-| AsyncAPI | Contract-first |
-| Observability | tracing + OpenTelemetry |
-| Unsafe Rust | Forbidden in owned crates by default |
-| Supply chain | cargo audit/deny/vet + SBOM |
-| AWCMS relationship | Requirements/provenance + compatibility fixtures, not source dependency |
-| Migration | Incremental, parity-tested, rollback-ready |
+The authoritative summary is the **[decision register in Appendix C](#appendix-c--decision-register)**, which carries, for each decision, its status, rationale, consequences, governing section and verification gate.
+
+This section previously restated those decisions as a second table. That duplicate has been removed rather than maintained: two summaries of the same decision set drift apart, and [§2.1](#21-documentation-drift-warning) is the document's own argument against exactly that. Consult Appendix C, and [§1](#1-executive-decision) for the one-screen view.
 
 ---
 
 ## 58. Final recommendation
 
-The proposed fully Rust backend is technically sound and strategically appropriate for AWBMS.
+**[R]** The proposed Rust backend is internally coherent and, on the reasoning recorded in [§5](#5-http-framework-decision-axum), [§6](#6-database-access-decision-sqlx) and [§8](#8-modular-monolith-decision), appropriate for AWBMS.
 
-The preferred architecture is:
+Stated precisely, so that the strength of this conclusion is not overread: the architecture is **sound as a design**, and **unvalidated as an implementation**. No AWBMS code, test, benchmark or deployment exists ([§0.1](#01-repository-state-verified)), and the AWCMS baseline it is compatible with has not yet been machine-inventoried (`VG-01`). This is the appropriate confidence level for a pre-Blueprint architecture validation; it is not a technical readiness statement.
+
+The preferred architecture, as one picture:
 
 ```text
 AWBMS
@@ -2179,6 +2280,38 @@ AWBMS
 ```
 
 The project is therefore **approved to proceed to Stage 1: AWBMS Master Blueprint**, subject to re-validating upstream AWCMS/AWCMS-Astro state at the start of each major migration/specification stage.
+
+---
+
+## Appendix A — Recorded external claims
+
+This register records claims inherited from the original validation rather than verified in the current AWBMS repository. The claims currently identified are `C-01`–`C-07`, including the claims labelled in §2 and §4.1. Each claim remains unresolved until `VG-01` re-checks it against a pinned source commit and stores the resulting inventory under `contracts/legacy/awcms/`.
+
+**Required fields:** claim ID, source repository, source commit, observation, verification date, verifier, evidence path, and disposition (`confirmed`, `amended`, or `rejected`).
+
+## Appendix B — Assumption register
+
+Assumptions are not facts and must not be carried into implementation silently. The current document contains assumptions about deployment topology, incumbent runtime behavior, migration access, workload shape, tenant boundaries, availability requirements, provider capabilities, and operational ownership. Before Blueprint sign-off, each assumption must receive an owner, a validation method, a target stage, and a disposition. If an assumption is falsified, its dependent decision must be revisited.
+
+## Appendix C — Decision register
+
+Decision identifiers such as `AD-01`, `AD-02`, `AD-04`, `AD-06`, `AD-07`, `AD-10`, `AD-11`, `AD-13`, `AD-14`, `AD-17`, `AD-18`, `AD-19`, `AD-20`, `AD-22`, `AD-24`, `AD-27`, and `AD-30` are the binding decision references used in this document. Their authoritative register entry must contain: status, decision text, rationale, alternatives considered, consequences, owner, date, superseded-by (if any), and verification gate. No decision is implementation-ready until those fields are completed in the Master Blueprint or a linked ADR.
+
+## Appendix D — Open decision register
+
+The currently explicit open decisions are `OD-01` (migration mode), `OD-02` (dependency/toolchain upgrade policy), `OD-04` (performance acceptance thresholds), and `OD-09` (AWBMS v1 module scope). The Blueprint must add any missing open decisions discovered during source inventory and assign each one an owner, deadline, decision criteria, and blocking stage. An open decision must not be silently resolved in implementation code.
+
+## Appendix E — Verification gate register
+
+The gates currently referenced are `VG-01` (AWCMS source inventory), `VG-03` (toolchain resolution), `VG-04` (ecosystem and sensitive-stack validation), `VG-05` (correctness/security parity), `VG-09` (performance validation), `VG-12` (recovery/rollback evidence), and `VG-15` (repository independence). Each gate must define its evidence artifact, executable check where applicable, pass/fail rule, owner, and last verified commit or date. A gate reference without evidence is not a passed gate.
+
+## Appendix F — Approval record
+
+**Status:** conditionally approved to begin Stage 1 — Master Blueprint. **Approver:** unassigned. **Approval date:** unassigned. **Conditions:** the entry conditions in §49.1 must be discharged before Blueprint sign-off. This section is intentionally incomplete until an owner records a real approval decision; it is not evidence of approval by itself.
+
+## Appendix G — AWCMS invariant traceability
+
+The required traceability chain is: AWCMS invariant → source evidence → AWBMS control/decision → automated test or operational check → owner. At minimum, the matrix must cover tenant isolation, authorization chokepoints, route/table/job ownership, migration immutability, auditability, data lifecycle, contract compatibility, and generated-artifact drift. The matrix is a Blueprint deliverable and must not be replaced by a prose assertion of parity.
 
 ---
 
