@@ -88,6 +88,14 @@ jobs:
           grep -F '"count": 148' /tmp/vg01-a/migrations.json
           grep -F '"status": "partial-static-source-evidence"' /tmp/vg01-a/manifest.json
 
+      - name: Verify frozen VG-01 evidence when present
+        run: |
+          if [[ -d contracts/legacy/awcms/frozen ]]; then
+            bash tools/vg01_verify_frozen.sh contracts/legacy/awcms
+          else
+            echo "Frozen VG-01 corpus not committed yet; gate remains PARTIAL"
+          fi
+
       - name: Upload deterministic VG-01 static evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
