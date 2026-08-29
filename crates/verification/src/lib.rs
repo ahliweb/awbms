@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use axum::{http::HeaderName, http::StatusCode, routing::get, Router};
+use axum::{Router, http::HeaderName, http::StatusCode, routing::get};
 use sqlx::{PgPool, Postgres, Transaction};
 use tower_http::{
     limit::RequestBodyLimitLayer,
@@ -47,11 +47,9 @@ impl<'a> TenantTransaction<'a> {
     }
 
     pub async fn visible_tenants(&mut self) -> Result<Vec<String>, sqlx::Error> {
-        sqlx::query_scalar::<_, String>(
-            "SELECT tenant_id FROM awbms_vg04_probe ORDER BY tenant_id",
-        )
-        .fetch_all(&mut *self.transaction)
-        .await
+        sqlx::query_scalar::<_, String>("SELECT tenant_id FROM awbms_vg04_probe ORDER BY tenant_id")
+            .fetch_all(&mut *self.transaction)
+            .await
     }
 
     pub async fn insert_probe(
