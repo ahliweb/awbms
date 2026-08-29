@@ -51,12 +51,21 @@ scalar() {
   psql "$TARGET_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "$1"
 }
 
-TABLE_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relname LIKE 'awcms\\_%' ESCAPE '\\' AND c.relname <> 'awcms_schema_migrations'")
-RLS_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relname LIKE 'awcms\\_%' ESCAPE '\\' AND c.relname <> 'awcms_schema_migrations' AND c.relrowsecurity")
-FORCE_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relname LIKE 'awcms\\_%' ESCAPE '\\' AND c.relname <> 'awcms_schema_migrations' AND c.relforcerowsecurity")
+# PostgreSQL represents ordinary tables as relkind='r' and partitioned table
+# parents as relkind='p'. A source-level CREATE TABLE inventory contains both,
+# so the live comparison must also include both. Excluding 'p' produces a
+# plausible-looking off-by-one and is exactly the kind of static/live mismatch
+# this gate exists to expose.
+TABLE_SCOPE="n.nspname='public' AND c.relkind IN ('r','p') AND c.relname LIKE 'awcms\\_%' ESCAPE '\\' AND c.relname <> 'awcms_schema_migrations'"
+TABLE_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE $TABLE_SCOPE")
+PARTITIONED_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE $TABLE_SCOPE AND c.relkind='p'")
+RLS_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE $TABLE_SCOPE AND c.relrowsecurity")
+FORCE_COUNT=$(scalar "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE $TABLE_SCOPE AND c.relforcerowsecurity")
 GLOBAL_COUNT=$((TABLE_COUNT - FORCE_COUNT))
 MIGRATION_COUNT=$(scalar "SELECT count(*) FROM awcms_schema_migrations")
 POLICY_COUNT=$(scalar "SELECT count(*) FROM pg_policies WHERE schemaname='public'")
+
+echo "VG-01 observed live state before assertions: migrations=$MIGRATION_COUNT tables=$TABLE_COUNT partitioned=$PARTITIONED_COUNT rls=$RLS_COUNT force_rls=$FORCE_COUNT global=$GLOBAL_COUNT policies=$POLICY_COUNT"
 
 [[ "$TABLE_COUNT" -eq "$EXPECTED_TABLES" ]] || { echo "VG-01 live DB drift: expected $EXPECTED_TABLES AWCMS tables, got $TABLE_COUNT" >&2; exit 1; }
 [[ "$RLS_COUNT" -eq "$EXPECTED_RLS" ]] || { echo "VG-01 live DB drift: expected $EXPECTED_RLS RLS-enabled tables, got $RLS_COUNT" >&2; exit 1; }
@@ -80,6 +89,7 @@ cat >"$OUTPUT_DIR/summary.json" <<JSON
   "migration_runner": "scripts/db-migrate.ts",
   "migration_count": $MIGRATION_COUNT,
   "awcms_table_count": $TABLE_COUNT,
+  "partitioned_parent_count": $PARTITIONED_COUNT,
   "rls_enabled_table_count": $RLS_COUNT,
   "force_rls_table_count": $FORCE_COUNT,
   "non_force_global_table_count": $GLOBAL_COUNT,
@@ -90,7 +100,7 @@ JSON
 
 psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -c "COPY (SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolcanlogin FROM pg_roles WHERE rolname IN ('$OWNER_ROLE','awcms_app','awcms_worker') ORDER BY rolname) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)" >"$OUTPUT_DIR/roles.csv"
 
-psql "$TARGET_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -c "COPY (SELECT c.relname AS table_name, pg_get_userbyid(c.relowner) AS owner, c.relrowsecurity AS rls_enabled, c.relforcerowsecurity AS force_rls, (SELECT count(*) FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relname LIKE 'awcms\\_%' ESCAPE '\\' ORDER BY c.relname) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)" >"$OUTPUT_DIR/tables-rls.csv"
+psql "$TARGET_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -c "COPY (SELECT c.relname AS table_name, c.relkind, pg_get_userbyid(c.relowner) AS owner, c.relrowsecurity AS rls_enabled, c.relforcerowsecurity AS force_rls, (SELECT count(*) FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') AND c.relname LIKE 'awcms\\_%' ESCAPE '\\' ORDER BY c.relname) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)" >"$OUTPUT_DIR/tables-rls.csv"
 
 psql "$TARGET_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -c "COPY (SELECT tablename, policyname, permissive, roles::text, cmd, COALESCE(qual,''), COALESCE(with_check,'') FROM pg_policies WHERE schemaname='public' ORDER BY tablename, policyname) TO STDOUT WITH (FORMAT CSV, HEADER TRUE)" >"$OUTPUT_DIR/policies.csv"
 
@@ -105,6 +115,6 @@ psql "$TARGET_ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -c "COPY (SELECT migration_
   sha256sum migration-ledger.csv policies.csv roles.csv routine-grants.csv summary.json table-grants.csv tables-rls.csv > manifest.sha256
 )
 
-echo "VG-01 controlled live AWCMS DB introspection passed: migrations=$MIGRATION_COUNT tables=$TABLE_COUNT rls=$RLS_COUNT force_rls=$FORCE_COUNT global=$GLOBAL_COUNT policies=$POLICY_COUNT"
+echo "VG-01 controlled live AWCMS DB introspection passed"
 cat "$OUTPUT_DIR/summary.json"
 cat "$OUTPUT_DIR/roles.csv"

@@ -88,6 +88,14 @@ jobs:
           grep -F '"count": 148' /tmp/vg01-a/migrations.json
           grep -F '"status": "partial-static-source-evidence"' /tmp/vg01-a/manifest.json
 
+      - name: Upload deterministic VG-01 static evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vg01-static-source-evidence
+          path: /tmp/vg01-a/
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Verify committed dependency graph
         run: cargo metadata --locked --format-version 1 --no-deps >/dev/null
 
