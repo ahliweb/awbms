@@ -15,35 +15,31 @@ The static generator fails closed if either checkout HEAD differs from the pinne
 
 ## Executable static-source controls
 
-`tools/vg01_inventory.rs`:
-
-1. verifies both Git SHAs before reading evidence;
-2. derives the AWCMS module inventory from `src/modules/index.ts` imports and requires exactly 24 registered base modules;
-3. enumerates `sql/*.sql`, requires exactly 148 migrations, and records SHA-256 per migration;
-4. derives AWCMS-Astro consumed/committed API paths from the AWCMS consumer-contract source and requires 13 consumed plus 2 committed paths;
-5. preserves the security/execution distinction between build-time machine reads, anonymous browser reads, telemetry writes, newsletter security-sensitive writes, and future committed contracts;
-6. freezes source copies of the module registry, generated repository inventory, OpenAPI, AsyncAPI, consumer-contract source, AWCMS CI/package metadata, and AWCMS-Astro contract/package metadata;
-7. emits a deterministic manifest containing SHA-256 for every generated/frozen file;
-8. intentionally records the resulting status as `partial-static-source-evidence`.
-
-CI runs the generator twice from separately checked-out pinned repositories and recursively diffs both outputs. This proves deterministic generation and detects source-count drift without granting the job repository write permission.
+`tools/vg01_inventory.rs` verifies both SHAs, derives the 24-module registry and 148-migration set, records SHA-256 per migration, derives the 13 consumed + 2 committed AWCMS-Astro paths with execution/security classes, freezes source candidates, and emits a deterministic SHA-256 manifest. CI runs it twice and recursively diffs the outputs.
 
 ## Controlled live PostgreSQL evidence
 
-`tools/vg01_live_db.sh` deliberately uses the pinned AWCMS repository's real `bun run db:migrate` / `scripts/db-migrate.ts` runner rather than implementing a second SQL apply loop.
+`tools/vg01_live_db.sh` uses the pinned AWCMS repository's real `bun run db:migrate` / `scripts/db-migrate.ts` runner rather than implementing a second migration engine. It then uses AWCMS's own `deriveTableRlsStates(loadMigrations())` code and compares that source-derived end-state name-for-name and RLS-state-for-RLS-state against PostgreSQL catalogs.
 
-The job follows the security posture documented by AWCMS's own integration harness:
+The job follows AWCMS's integration-harness security posture:
 
 1. create a fresh ephemeral database with a purpose-built owner role;
 2. permit that owner to be SUPERUSER only while the historical migration set runs, because migration 019 configures a custom PostgreSQL GUC on `awcms_app`;
 3. immediately demote the owner to `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`;
-4. inspect the resulting live PostgreSQL catalogs;
-5. fail closed unless the pinned baseline produces 148 ledger entries, 152 AWCMS business tables, 134 RLS-enabled tables, 134 FORCE-RLS tables, and 18 non-FORCE/global tables;
-6. fail if the owner, `awcms_app`, or `awcms_worker` has SUPERUSER/BYPASSRLS after demotion;
-7. fail if `awcms_app` or `awcms_worker` owns a business table;
-8. export deterministic evidence for roles, table ownership/RLS flags, policies, table grants, routine grants, and migration checksums.
+4. inspect PostgreSQL roles, table ownership, RLS/FORCE-RLS state, policies, table/routine grants, and the migration checksum ledger;
+5. fail if runtime roles own business tables or if owner/app/worker retains SUPERUSER/BYPASSRLS.
 
-The workflow uploads the live evidence as a read-only CI artifact; it does not grant GitHub contents write permission.
+### Resolved table-count scope discrepancy
+
+The generated AWCMS inventory says 152 `awcms_*` tables, 134 FORCE-RLS tables, and 18 non-FORCE/global tables. The first live introspection incorrectly excluded `awcms_schema_migrations`, which made the result appear as 151 tables and 17 non-FORCE tables while all 134 RLS/FORCE-RLS tables matched.
+
+This was an introspection-scope defect, not an AWCMS schema defect. `sql/001_awcms_foundation_schema.sql` declares `awcms_schema_migrations`, and `scripts/db-migrate.ts` also pre-creates that same ledger before applying migration 001. Therefore:
+
+- **all `awcms_*` scope:** 152 tables = 134 FORCE-RLS + 18 non-FORCE, including the migration ledger;
+- **business-table scope:** 151 tables = 134 FORCE-RLS + 17 non-FORCE, excluding only `awcms_schema_migrations`;
+- the migration ledger contains 148 applied migration records at the pinned baseline.
+
+The gate now records both scopes explicitly and compares the full 152-table source set against the full live 152-table set. This avoids mislabeling the migration ledger as a business/global domain table while preserving parity with AWCMS's generated repository inventory.
 
 ## VG-15 independence
 
@@ -51,16 +47,16 @@ The workflow uploads the live evidence as a read-only CI artifact; it does not g
 
 ## Dependency/supply-chain posture
 
-The static generator and independence gate use only the Rust standard library plus runner-provided `git`/`sha256sum`. The live database check uses the pinned AWCMS lockfile and the AWCMS migration runner. No AWBMS Cargo dependency or lockfile update is introduced.
+The static generator and independence gate use only the Rust standard library plus runner-provided `git`/`sha256sum`. The live database check uses the pinned AWCMS lockfile and AWCMS migration runner. No AWBMS Cargo dependency or lockfile update is introduced.
 
 ## Why VG-01 remains PARTIAL
 
-Even after the live catalog job is green, `VG-01` remains PARTIAL until the reviewed evidence is frozen and consumed by AWBMS checks. Remaining work:
+Even after the static and live catalog jobs are green, `VG-01` remains PARTIAL until the reviewed evidence is frozen and consumed by AWBMS checks. Remaining work:
 
 - executable/frozen authorization vectors;
 - representative request/response/behavior parity fixtures;
 - checked-in static and live evidence under `contracts/legacy/awcms/`;
 - artifact-to-test/orphan-fixture enforcement;
-- reconciliation of any static/live contradiction into the Master Blueprint.
+- reconciliation of any later static/live contradiction into the Master Blueprint.
 
 A green CI artifact is evidence, but it is not yet the immutable compatibility corpus required for Stage-1 sign-off.
