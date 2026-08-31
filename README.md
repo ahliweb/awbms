@@ -7,23 +7,29 @@ stage.
 |---|---|
 | Version | see [`VERSION`](VERSION) · [`CHANGELOG.md`](CHANGELOG.md) |
 | Stage | pre-Blueprint · conditionally approved to begin Stage 1 |
-| Repository state | specification and governance only — **no Rust code yet** |
+| Repository state | Stage 1 in progress — Blueprint, frozen AWCMS inventory, and a Rust verification spike |
 
 ## What this repository is right now
 
-**It contains no Rust code.** There is no `Cargo.toml`, no `Cargo.lock`, no
-`rust-toolchain.toml`, no `migrations/` and no `contracts/`. Nothing here has
-been built, benchmarked or deployed.
+**There is no AWBMS application yet.** No module, no HTTP surface, no
+`migrations/`. Nothing here has been benchmarked or deployed.
 
-What it does contain is the [architecture
-validation](docs/architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md): a
-decision record for a Rust backend — Axum, Tokio, PostgreSQL with SQLx, a
-modular monolith with FORCE RLS tenant isolation — together with the registers
-that track which of those decisions are verified, assumed, or still open.
+What exists is Stage 1 groundwork:
 
-The document is deliberately explicit that it is a *design*, not an
-*implementation*. Every external claim it inherits carries a verification gate,
-and none of those gates has been discharged. Read §0 before §1.
+- the [architecture validation](docs/architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md) —
+  a decision record for a Rust backend (Axum, Tokio, PostgreSQL with SQLx, a
+  modular monolith with FORCE RLS tenant isolation) plus the registers tracking
+  which decisions are verified, assumed, or open;
+- the [Master Blueprint](docs/architecture/AWBMS-MASTER-BLUEPRINT.md) and
+  [Stage 1 gates](docs/architecture/AWBMS-STAGE-1-GATES.md);
+- a **frozen AWCMS inventory** under `contracts/legacy/awcms/frozen/`, pinned to
+  source commits with SHA-256 manifests (`VG-01`, partial);
+- a **Rust verification spike** in `crates/verification` proving Axum, Tokio,
+  SQLx and FORCE RLS compose as assumed (`VG-03`, `VG-04` — both PASS).
+
+Four of sixteen gates pass; one is partial; eleven are open. **No gate covering
+AWBMS behaviour has passed** — parity, performance and rollback are all open.
+Read §0 before §1.
 
 ## Layout
 
@@ -48,7 +54,7 @@ awbms/
 The Cargo workspace layout that this repository will eventually adopt is
 proposed in [§9 of the
 validation](docs/architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md#9-proposed-cargo-workspace).
-It does not exist yet.
+Only `crates/verification` exists so far; the module and app layout is still proposed.
 
 ## Start here
 
@@ -81,8 +87,9 @@ Rust-native mechanisms.
 
 This repository has no source or runtime dependency on AWCMS, and must not
 acquire one. Compatibility is asserted only through frozen, provenance-stamped
-fixtures under `contracts/legacy/awcms/` — a directory that does not exist yet,
-and whose creation is the outstanding `VG-01` gate.
+fixtures under `contracts/legacy/awcms/`, each stamped with the AWCMS commit it
+was taken from. That directory now exists and is populated; `VG-01` is partial,
+not discharged.
 
 ## Licence
 

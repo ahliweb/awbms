@@ -5,6 +5,17 @@
 | Document | What it settles |
 |---|---|
 | [AWBMS Rust Architecture Validation](AWBMS-RUST-ARCHITECTURE-VALIDATION.md) | Whether a coherent Rust architecture can be specified for AWBMS, and which selections it makes |
+| [AWBMS Master Blueprint](AWBMS-MASTER-BLUEPRINT.md) | Stage 1 formalisation of the validated architecture |
+| [Stage 1 gates](AWBMS-STAGE-1-GATES.md) | Per-gate status and the evidence each one requires. **The authoritative gate status** |
+| [Invariant traceability](AWBMS-INVARIANT-TRACEABILITY.md) | AWCMS invariant → AWBMS control → automated check |
+| [`evidence/`](evidence/) | Dated gate evidence records (`VG-01` static pipeline, `VG-03`/`VG-04`) |
+
+> **Two gate registers exist, and that is a drift risk.** Appendix E of the
+> validation and `AWBMS-STAGE-1-GATES.md` both carry gate status. The Stage 1
+> document is authoritative for *status*; Appendix E is authoritative for what
+> each gate *means* and which decision it backs. Nothing currently keeps the
+> status columns equal — reconciling them, or making one generated from the
+> other, is outstanding work.
 
 ## Reading order
 
