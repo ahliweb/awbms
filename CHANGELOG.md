@@ -11,6 +11,23 @@ Do not hand-edit a released section; add a changeset instead.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-31
+
+### Added
+
+- **architecture-validation** — Add the Stage 1 Master Blueprint, gate register and invariant traceability
+- **workspace** — Bootstrap the Cargo workspace and verification spike (VG-03, VG-04 PASS)
+- **contracts** — Freeze the AWCMS source inventory under contracts/legacy/awcms (VG-01 partial)
+
+### Changed
+
+- **architecture-validation** — Confirm C-01, C-02 and C-03 against the frozen inventory; supersede C-06
+
+### Fixed
+
+- **architecture-validation** — Correct §0.1 and §3.1, which the Stage 1 merge falsified
+- **scripts** — Exclude checksum-pinned legacy fixtures from documentation link checks
+
 ## [0.2.0] — 2026-08-31
 
 ### Added

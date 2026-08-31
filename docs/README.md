@@ -51,14 +51,17 @@ and used across all documents:
 | `[O]` | It is deliberately unresolved | Do not resolve it in passing |
 | `[G]` | It names the evidence that would settle the matter | A gate reference is not a passed gate |
 
-The single most important thing to understand about this documentation set:
-**no verification gate has been discharged.** Sixteen are defined. Fourteen are
-open. The two that pass — `VG-15` (repository independence) and `VG-16`
-(document and version integrity) — are standing structural conditions checked
-by `scripts/check-docs.sh`, not evidence that any architectural claim is true.
+The most important thing to understand about this documentation set: of sixteen
+verification gates, **four pass, one is partial, and eleven are open.**
 
-Everything recorded about AWCMS is a `[C]` claim inherited from a validation
-exercise, not a verified fact.
+- `VG-03`, `VG-04` — the Rust stack composes as assumed. Real evidence, narrow scope.
+- `VG-15`, `VG-16` — standing structural conditions checked on every commit. They
+  say nothing about whether an architectural claim is true.
+- `VG-01` — **partial**. The AWCMS inventory is frozen and confirms `C-01`–`C-03`;
+  `C-04`, `C-05` and `C-07` remain unverified.
+
+**No gate covering AWBMS behaviour has passed.** Parity, performance and rollback
+are all open, and no AWBMS module exists to test.
 
 ## Known gaps
 
@@ -66,9 +69,9 @@ These are absences, recorded so that nobody mistakes them for oversights.
 
 | Gap | Blocked on | Tracked as |
 |---|---|---|
-| No AWCMS source inventory under `contracts/legacy/awcms/` | access to the AWCMS repository | `VG-01` |
-| No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–7 | §49.2 |
-| No Cargo workspace, toolchain pin, or CI for Rust | `AD-02`, §51 step 1 | `VG-03` |
+| AWCMS inventory frozen but `VG-01` still **partial** — `C-04`/`C-05` gates not yet marked enforced/advisory/absent | per-gate determination | `VG-01` |
+| No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–7 | §49.2, `OD-06` |
+| No AWBMS application module — the workspace holds only `crates/verification` | Blueprint sign-off, §51 step 10 | `VG-02` |
 | No performance baseline for AWBMS or AWCMS | benchmark corpus, §23.1 | `VG-09`, `OD-04` |
 | No licence file, and no dependency licence allow-list | an ownership decision nobody has recorded | `OD-08` |
 | No approver named on the architecture validation | an owner accepting the conditional approval | Appendix F |

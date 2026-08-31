@@ -4,7 +4,7 @@
 |---|---|
 | Project | AWBMS — AhliWeb Backend Management System |
 | Repository | `ahliweb/awbms` |
-| Specification version | v0.2.0 |
+| Specification version | v0.3.0 |
 | Status | Architecture validation — **conditionally approved** to enter Stage 1 (see [§49](#49-master-blueprint-entry-conditions) and [Appendix F](#appendix-f--approval-record)) |
 | Original validation date | 2026-08-29 |
 | Last revision | 2026-08-31 (register completion and defect correction; no architectural decision reversed) |
@@ -20,14 +20,16 @@
 
 ### 0.1 Repository state (verified)
 
-**[F]** The `ahliweb/awbms` repository contains **no Rust code**. There is no `Cargo.toml`, `Cargo.lock` or `rust-toolchain.toml`, no `migrations/` directory, no `contracts/` directory, and no git submodule. What it does contain, besides this document, is governance material: a README, contribution rules, three ADRs, the version and changeset system ([§0.5](#05-document-control)), three Claude Code skills, and the shell scripts that check them.
+**[F]** The `ahliweb/awbms` repository now contains a pinned Rust toolchain (`rust-toolchain.toml`), a Cargo workspace with a committed `Cargo.lock`, a `crates/verification` spike with executable PostgreSQL RLS and graceful-shutdown tests, a frozen AWCMS inventory under `contracts/legacy/awcms/`, the Stage 1 Master Blueprint, and the governance material described in [§0.5](#05-document-control). There is still no `migrations/` directory, no application module, and no git submodule.
 
-> **This statement is machine-checked, not hand-maintained.** The original version of this section named a commit SHA and asserted a file count, which is a fact that decays on the next commit — and which a commit cannot state about itself. The Rust-absence half of the claim above is now re-derived on every push by `scripts/check-docs.sh`, and the repository-independence half is gate `VG-15`. A reader who wants the current state should run the script rather than trust this paragraph.
+> **This section was rewritten at v0.3.0, and the reason matters more than the content.** Up to v0.2.0 it read *"contains exactly one tracked file — this document"*, pinned to commit `5f8f9aa`. That was true when written and false shortly afterwards. A commit cannot state its own SHA, so a hand-maintained commit reference in a document header is guaranteed to lag by at least one revision.
+>
+> The claim is therefore split: what the repository does **not** contain is re-derived on every push by `scripts/check-docs.sh` (`VG-16`) and `tools/vg15_independence.rs` (`VG-15`); what it **does** contain is described in prose that a reader should treat as a snapshot. Run the scripts rather than trusting this paragraph.
 
-Two consequences follow, and they govern the whole document:
+Two consequences follow. **Both were weakened by the Stage 1 merge and neither has been retired:**
 
-1. **Nothing in this document describes implemented behavior.** Every architectural statement is a *proposal* for work not yet started. No benchmark has been run, no test suite exists, no dependency version has been resolved by a build.
-2. **Claims about systems outside this repository cannot be verified from it.** The AWCMS facts in [§2](#2-source-of-truth-review) and the Rust release fact in [§4.1](#41-recommended-baseline) were asserted by the original validation. They are preserved verbatim as *recorded claims*, each carrying a verification gate. They are not treated as established facts.
+1. **Almost nothing in this document describes implemented behavior.** The exception is now real but narrow: the `VG-04` spike proves that Axum, Tokio, SQLx and PostgreSQL FORCE RLS compose as this architecture assumes. No AWBMS *module* exists, no benchmark has been run, and no parity test exists. Every other architectural statement remains a proposal.
+2. **Claims about systems outside this repository were unverifiable from it, and several no longer are.** `VG-01` has frozen a machine-generated AWCMS inventory with recorded source commits and SHA-256 digests, which confirms `C-01`, `C-02`, `C-03` and `C-06` — see [Appendix A](#appendix-a--recorded-external-claims). The remaining claims still carry gates and are not treated as established facts.
 
 ### 0.2 Claim labels
 
@@ -58,9 +60,13 @@ Statements are labelled where their epistemic status matters. Unlabelled prose i
 | Open decisions — total | 9 | [Appendix D](#appendix-d--open-decision-register) |
 | Open decisions blocking Blueprint sign-off | 6 | [Appendix D](#appendix-d--open-decision-register) |
 | Verification gates | 16 | [Appendix E](#appendix-e--verification-gate-register) |
-| Verification gates discharged | **0** | [Appendix E](#appendix-e--verification-gate-register) |
+| Verification gates **passed** | 4 | `VG-03`, `VG-04`, `VG-15`, `VG-16` |
+| Verification gates **partial** | 1 | `VG-01` |
+| Verification gates **open** | 11 | [Appendix E](#appendix-e--verification-gate-register) |
 
-The last row is the one that matters. Sixteen gates are defined; none has produced evidence. Every count above describes the *structure* of the validation, not its confirmation.
+The gate rows are the ones that matter, and they changed at v0.3.0. Up to v0.2.0 every gate was open and this table's honest summary was *"none has produced evidence"*. Stage 1 changed that for four of them.
+
+Read the four passes narrowly. `VG-03` and `VG-04` establish that the *stack* works — a pinned toolchain, and a spike in which Axum, Tokio, SQLx and FORCE RLS compose as assumed. `VG-15` and `VG-16` are standing structural conditions, not architectural evidence. **No gate covering AWBMS behaviour has passed:** parity (`VG-05`), performance (`VG-09`), rollback (`VG-12`) and every module-level gate remain open, and `VG-01` is partial.
 
 **What this validation does and does not establish.** It establishes that a coherent, internally consistent Rust architecture *can* be specified for AWBMS, and it records the trade-off reasoning for each major selection. It does **not** establish that the selected crates meet AWBMS requirements under load, that AWCMS behavior has been inventoried, or that migration is feasible on any particular schedule. Those are the open items in Appendices A, D and E.
 
@@ -154,7 +160,9 @@ AWBMS is therefore **not “AWCMS rewritten line-by-line in Rust.”** It is a n
 
 **[C]** `C-03` — the AWCMS *architecture documentation* reports migrations through `sql/148`, PostgreSQL `FORCE ROW LEVEL SECURITY` for tenant-scoped tables, separated database roles, module composition rules, OpenAPI/AsyncAPI contracts, audit/event systems, and a read/write SYSTEM administration surface.
 
-> **Known contradiction — do not propagate `C-03` uncritically.** `C-03` is sourced from AWCMS prose, and [§2.1](#21-documentation-drift-warning) states that AWCMS prose is known to lag the implementation and must be outranked by the registry, migrations and executable tests. The migration count `sql/148` is therefore a *documentation* figure of unknown accuracy, not a verified schema state. `VG-01` MUST re-derive it from the migration directory and ledger table rather than from prose. The same caution applies to the capability descriptions in `C-03`; `C-02`'s module list, by contrast, was reported from the registry and is more likely to hold, but is gated identically.
+> **Resolved at v0.3.0 — the caution below is retained because its reasoning still applies elsewhere.** `C-03` was sourced from AWCMS prose, which [§2.1](#21-documentation-drift-warning) states is known to lag implementation, so `sql/148` was treated as a documentation figure of unknown accuracy rather than a verified schema state. `VG-01` has now re-derived it from the migration ledger: **148 migrations, 134 tables with RLS, all 134 `FORCE`**. The prose was right.
+>
+> That outcome does not vindicate trusting prose. It means this particular figure survived checking, and the only reason anyone knows that is that it was checked. The capability descriptions in `C-03` remain prose and remain unverified.
 
 **[C]** `C-04` — AWCMS contains machine-enforced architectural gates, including checks for:
 
@@ -218,7 +226,7 @@ Each artifact MUST be stored under `contracts/legacy/awcms/` with the provenance
 
 **[F]** This repository has **no** dependency on AWCMS of any kind: no git submodule, no `.gitmodules`, no Cargo manifest and therefore no path or git dependency, and no vendored AWCMS source. Independence is currently a fact, not merely an intention — and unlike the original statement of it, which named a commit and aged immediately, it is now re-checked on every push by `scripts/check-docs.sh` under gate `VG-15`.
 
-**[F]** Equally, `contracts/legacy/awcms/` does not yet exist. The fixture pipeline described below is entirely prospective, and `VG-01` is the gate that would make it real.
+**[F]** `contracts/legacy/awcms/` now exists and is populated. The fixture pipeline described below is no longer prospective: frozen static and live inventories are committed under `contracts/legacy/awcms/frozen/`, each carrying source commits (`awcms` `11f2e95a…`, `awcms-astro` `7b753be6…`), SHA-256 manifests, and regeneration tooling under `tools/`. `VG-01` is **PARTIAL**, not discharged — see [Appendix E](#appendix-e--verification-gate-register).
 
 ### 3.2 Prohibited couplings
 
@@ -2345,18 +2353,20 @@ The project is therefore **approved to proceed to Stage 1: AWBMS Master Blueprin
 
 ## Appendix A — Recorded external claims
 
-Claims inherited from the original validation, observed against repositories **outside** this one and therefore not verifiable from it. Each is unresolved until `VG-01` re-checks it against a pinned source commit and stores the result under `contracts/legacy/awcms/`.
+Claims inherited from the original validation, observed against repositories **outside** this one and therefore not verifiable from it.
 
-Verification date, verifier and evidence digest are recorded in the inventory artifact itself, not duplicated here — the inventory is the evidence, and a second copy of its metadata would be one more thing to drift.
+**Four of the seven were confirmed at v0.3.0** by the `VG-01` freeze, which pinned `ahliweb/awcms` at `11f2e95a…` and `ahliweb/awcms-astro` at `7b753be6…` and generated machine-readable inventories under `contracts/legacy/awcms/frozen/`. Verification date, verifier and evidence digest live in the inventory artifacts, not here — the inventory is the evidence, and a second copy of its metadata would be one more thing to drift.
+
+The confirmations are worth noting precisely because the document expected the opposite. `C-03` was flagged as the weakest claim in this register, sourced from prose that [§2.1](#21-documentation-drift-warning) says is known to lag implementation; re-derived from the migration ledger it came back exactly right at 148. Being wrong about which claims would fail is a better outcome than not having checked.
 
 | Claim | Source | Observation | Gate | Disposition |
 |---|---|---|---|---|
-| `C-01` | `ahliweb/awcms` v10.1.0 @ `11f2e95a47b1328a820f976d60f978c38a067903`, 2026-08-28; `ahliweb/awcms-astro` @ **no commit recorded** | The AWCMS state the original validation reviewed | `VG-01` | **Unverified.** The missing `awcms-astro` commit is itself a defect: the consumer contract surface in [§39](#39-awcms--awbms-parity-harness) depends on it |
-| `C-02` | AWCMS module registry source | AWCMS contains 24 registered modules, listed in [§2](#2-source-of-truth-review) | `VG-01` | **Unverified.** Reported from the registry rather than prose, so more likely to hold than `C-03`, but gated identically. An inventory, **not** an AWBMS v1 scope commitment — see `OD-09` |
-| `C-03` | AWCMS *architecture prose* | Migrations through `sql/148`; FORCE RLS on tenant-scoped tables; separated database roles; module composition rules; OpenAPI/AsyncAPI contracts; audit/event systems; SYSTEM administration surface | `VG-01` | **Unverified, and known to be the weakest claim here.** Sourced from prose that [§2.1](#21-documentation-drift-warning) states is known to lag implementation. `sql/148` is a documentation figure of unknown accuracy; `VG-01` MUST re-derive it from the migration directory and ledger table |
+| `C-01` | `ahliweb/awcms` v10.1.0 @ `11f2e95a47b1328a820f976d60f978c38a067903`, 2026-08-28; `ahliweb/awcms-astro` @ `7b753be619244541b817d5d8e7d3b72cfe88d4f9` | The AWCMS state the original validation reviewed | `VG-01` | **Confirmed** (v0.3.0). The freeze pinned the same `awcms` commit, and **the recorded defect is closed**: the missing `awcms-astro` commit — which the consumer contract surface in [§39](#39-awcms--awbms-parity-harness) depends on — is now recorded in `frozen/provenance.json` |
+| `C-02` | AWCMS module registry source | AWCMS contains 24 registered modules, listed in [§2](#2-source-of-truth-review) | `VG-01` | **Confirmed** (v0.3.0). `frozen/static/modules.json` contains exactly 24. Still an inventory, **not** an AWBMS v1 scope commitment — see `OD-09` |
+| `C-03` | AWCMS *architecture prose* | Migrations through `sql/148`; FORCE RLS on tenant-scoped tables; separated database roles; module composition rules; OpenAPI/AsyncAPI contracts; audit/event systems; SYSTEM administration surface | `VG-01` | **Confirmed on the checkable parts** (v0.3.0), against expectation. Re-derived from the ledger: **148** migrations; **134** tables with RLS, all 134 `FORCE`; roles and grants captured in `frozen/live/`. The capability descriptions remain prose and are not individually verified |
 | `C-04` | AWCMS CI configuration and gate scripts | AWCMS enforces machine-checked architectural gates, listed in [§2](#2-source-of-truth-review) | `VG-01` | **Unverified.** `VG-01` MUST record each listed gate as *enforced in CI*, *advisory*, or *absent* |
 | `C-05` | Original validation narrative | Those gates were created in response to production or review failures, and therefore encode invariants a feature list does not capture | `VG-01` | **Unverified, and strategically load-bearing.** `C-05` is why AWBMS treats AWCMS as a requirements source rather than a codebase to translate (`AD-01`). If the gates prove aspirational, the AWBMS gate set in [§28](#28-maintainability-and-code-quality-gates) must be re-derived from threat modelling instead of inheritance |
-| `C-06` | Original validation, dated 2026-08-20 | Rust stable `1.98.0` released; Tokio, Axum, SQLx, Tower, Reqwest, Serde, rustls and OpenTelemetry production-ready at that date | `VG-03` | **Unverified and time-decaying.** MUST NOT be carried into the Blueprint ([§49.1](#491-entry-conditions) condition 5). Resolve the real toolchain version at bootstrap and record it in `rust-toolchain.toml` |
+| `C-06` | Original validation, dated 2026-08-20 | Rust stable `1.98.0` released; Tokio, Axum, SQLx, Tower, Reqwest, Serde, rustls and OpenTelemetry production-ready at that date | `VG-03` | **Superseded, which is the correct outcome — not "confirmed".** `rust-toolchain.toml` now pins the toolchain and `Cargo.lock` resolves the graph, so the build manifests are the source of truth and this claim has no further authority. [§49.1](#491-entry-conditions) condition 5 is satisfied by the pin existing, not by the version matching |
 | `C-07` | AWCMS newsletter hardening, **no commit or date recorded** | Per-IP rate limits alone could not prevent repeated email delivery to a victim address; recipient-oriented cooldown semantics were required | `VG-01` | **Unverified.** `VG-01` MUST capture the actual rate-limit dimensions from the implementation rather than from [§32](#32-abuse-resistance) |
 
 ## Appendix B — Assumption register
@@ -2439,14 +2449,16 @@ Six of the nine block Blueprint sign-off ([§49.1](#491-entry-conditions) condit
 
 A gate defines the evidence that would move a claim or decision from *reasoned* to *established*. **A gate reference is not a passed gate.**
 
-**Every gate below is open. Zero have been discharged.** `VG-16` is the only one with a working executable check, and it verifies this document's structure, not its truth.
+**Four pass, one is partial, eleven are open.** That changed at v0.3.0; up to v0.2.0 every gate was open.
+
+Read the passes for what they are. `VG-03` and `VG-04` establish that the chosen stack composes as assumed. `VG-15` and `VG-16` are standing structural conditions checked on every commit — they say nothing about whether any architectural claim is true. **No gate covering AWBMS behaviour has passed.**
 
 | ID | Gate | Evidence artifact | Executable check | Pass rule | Status |
 |---|---|---|---|---|---|
-| `VG-01` | AWCMS source inventory | `contracts/legacy/awcms/` — module registry, migration list with per-file SHA-256, RLS/FORCE RLS table list, roles and grants, route inventory, OpenAPI/AsyncAPI documents, gate list marked enforced/advisory/absent, authorization vectors, rate-limit dimensions, credential formats | Re-runnable generator committed to this repository, recording the AWCMS commit SHA | Every item in [§2.2](#22-required-awcms-source-inventory-vg-01) present and machine-derived, not prose | **Open.** Blocked on `AS-03` |
+| `VG-01` | AWCMS source inventory | `contracts/legacy/awcms/` — module registry, migration list with per-file SHA-256, RLS/FORCE RLS table list, roles and grants, route inventory, OpenAPI/AsyncAPI documents, gate list marked enforced/advisory/absent, authorization vectors, rate-limit dimensions, credential formats | Re-runnable generator committed to this repository, recording the AWCMS commit SHA | Every item in [§2.2](#22-required-awcms-source-inventory-vg-01) present and machine-derived, not prose | **PARTIAL.** Static and live inventories are frozen under `contracts/legacy/awcms/frozen/` with source commits, SHA-256 manifests and regeneration tooling, confirming `C-01`–`C-03`. Not PASS: the gate list of `C-04`/`C-05` is not yet marked enforced/advisory/absent per item, and authorization vectors are not yet consumed by AWBMS tests |
 | `VG-02` | Repository bootstrap and CI green | Cargo workspace, `rust-toolchain.toml`, CI configuration | The [§28](#28-maintainability-and-code-quality-gates) command set, plus module DAG, route, table and job ownership checks | All gates green on a commit | **Open.** No workspace exists |
-| `VG-03` | Toolchain resolution and pin | `rust-toolchain.toml`, `Cargo.lock` | `cargo --version` in CI against the pin | Toolchain resolved at bootstrap and pinned; `C-06` retired rather than carried forward | **Open** |
-| `VG-04` | Ecosystem and sensitive-stack validation | A prototype exercising Axum/Tower, SQLx with RLS and `SKIP LOCKED`, and the transactional outbox | Prototype integration tests | The two flagged `AD-06` matrix rows re-checked against current upstream documentation, and `AD-04`/`AD-06` confirmed or revised on evidence | **Open.** `AD-04` and `AD-06` currently rest on reasoning alone |
+| `VG-03` | Toolchain resolution and pin | `rust-toolchain.toml`, `Cargo.lock` | `cargo --version` in CI against the pin | Toolchain resolved at bootstrap and pinned; `C-06` retired rather than carried forward | **PASS.** Exact `rust-toolchain.toml`, committed `Cargo.lock`, read-only CI with `--locked`. Evidence: `docs/architecture/evidence/VG-03-VG-04-2026-08-29.md` |
+| `VG-04` | Ecosystem and sensitive-stack validation | A prototype exercising Axum/Tower, SQLx with RLS and `SKIP LOCKED`, and the transactional outbox | Prototype integration tests | The two flagged `AD-06` matrix rows re-checked against current upstream documentation, and `AD-04`/`AD-06` confirmed or revised on evidence | **PASS.** Verification spike covers request lifecycle, graceful shutdown, tenant-local SQLx transaction context and non-superuser FORCE-RLS denial against real PostgreSQL. Evidence: `evidence/VG-03-VG-04-2026-08-29.md`. Note the narrowness: it validates *composition*, not AWBMS performance or `AS-04` |
 | `VG-05` | Correctness and security parity | Parity harness output over the AWCMS request corpus | `tests/parity/` | No unexplained semantic difference; normalisation limited to legitimately nondeterministic fields | **Open.** Blocked on `VG-01` and `OD-03` |
 | `VG-06` | Tenant isolation and RLS evidence | RLS test results, `pg_class`/`pg_policy` introspection, role privilege assertions | `tests/rls/` | Cross-tenant access denied at all three layers ([§11.2](#112-tenant-security)); `awbms_app` confirmed `NOBYPASSRLS` and non-owner | **Open** |
 | `VG-07` | Authorization chokepoint coverage | Route-to-authorization mapping; decision log samples | Static check that every protected route passes the chokepoint | No protected operation bypasses it; no undocumented exception | **Open** |
@@ -2457,7 +2469,7 @@ A gate defines the evidence that would move a claim or decision from *reasoned* 
 | `VG-12` | Recovery and rollback evidence | Rehearsal record per migration wave | Restore test against a production-like snapshot | Recovery point verified and rollback executed successfully **before** the wave deploys | **Open** |
 | `VG-13` | Supply-chain evidence | `cargo audit`, `deny`, `vet` output; SBOM; container scan; licence report | [§28](#28-maintainability-and-code-quality-gates) command set | All clean or with recorded, reviewed exceptions. Blocked on `OD-08` for the licence allow-list | **Open** |
 | `VG-14` | Data lifecycle and privacy coverage | Per-module lifecycle and subject-data descriptors | Coverage check over data-owning modules | Every data-owning module declares descriptors, and declarations match behaviour; legal hold demonstrably non-bypassable | **Open** |
-| `VG-15` | Repository independence | Absence of `.gitmodules`; absence of AWCMS path or git dependencies in any Cargo manifest; no vendored AWCMS source | `scripts/check-docs.sh` | No coupling of any prohibited form in [§3.2](#32-prohibited-couplings) | **Currently satisfied and continuously checked.** Not *discharged* — it is a standing condition, not a one-off proof |
+| `VG-15` | Repository independence | Absence of `.gitmodules`; absence of AWCMS path or git dependencies in any Cargo manifest; no vendored AWCMS source | `scripts/check-docs.sh` | No coupling of any prohibited form in [§3.2](#32-prohibited-couplings) | **PASS, and now automated twice** — `scripts/check-docs.sh` plus `tools/vg15_independence.rs`. A standing condition rather than a one-off proof: it can regress on any commit, which is why it is checked on every one |
 | `VG-16` | Documentation and version integrity | This document, `VERSION`, `CHANGELOG.md`, `.changeset/` | `scripts/check-docs.sh` | Version consistent across all three locations; every identifier resolves to exactly one register row; no orphaned rows; every internal anchor resolves; changesets well-formed | **Currently passing.** Verifies structure only — it cannot tell whether any claim here is true |
 
 ## Appendix F — Approval record
@@ -2473,14 +2485,16 @@ A gate defines the evidence that would move a claim or decision from *reasoned* 
 
 Stage 1 may begin immediately; Blueprint authoring is itself the work that closes most open decisions. Stage 1 may not **complete** until the six conditions in [§49.1](#491-entry-conditions) are discharged.
 
-| Condition | State |
+| Condition | State at v0.3.0 |
 |---|---|
-| 1 — `VG-01` discharged, superseding `C-01`–`C-05` and `C-07` | Not started; blocked on `AS-03` |
+| 1 — `VG-01` discharged, superseding `C-01`–`C-05` and `C-07` | **Partial.** `C-01`, `C-02`, `C-03` confirmed; `C-04`, `C-05`, `C-07` still unverified — the per-gate enforced/advisory/absent determination is the outstanding work |
 | 2 — every Blueprint-blocking open decision closed | 0 of 6 closed |
-| 3 — every assumption confirmed or its dependent decision revisited | 0 of 8 confirmed |
-| 4 — `VG-03` and `VG-04` discharged | Not started |
-| 5 — `C-06` removed rather than carried forward | Pending Blueprint authoring |
+| 3 — every assumption confirmed or its dependent decision revisited | 1 of 8. `AS-03` is discharged in practice — the inventory freeze required exactly the access it assumes |
+| 4 — `VG-03` and `VG-04` discharged | **Met.** Both PASS |
+| 5 — `C-06` removed rather than carried forward | **Met.** Superseded by `rust-toolchain.toml` and `Cargo.lock` |
 | 6 — AWBMS v1 module scope defined (`OD-09`) | Open |
+
+Two of six conditions are met and a third is partial. **Stage 1 remains `IN PROGRESS`**, consistent with `AWBMS-STAGE-1-GATES.md`: the Blueprint cannot be signed off while `VG-01` is partial and six Blueprint-blocking open decisions stand.
 
 If condition 1 falsifies a material claim — for example if the `C-04`/`C-05` gates prove advisory rather than enforced — this validation MUST be revised before the Blueprint proceeds, not patched inside it.
 

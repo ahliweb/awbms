@@ -141,7 +141,13 @@ fi
 # ---------------------------------------------------------------- 5..6 links
 group "Internal link integrity"
 
-DOCS="$(find . -name '*.md' -not -path './.git/*' | sort)"
+# Frozen legacy fixtures under contracts/legacy/ are verbatim copies of external
+# artifacts, checksum-pinned by their manifests (VG-01). Their links point into
+# the AWCMS tree and do not resolve here — correctly so. Rewriting them to
+# satisfy a link checker would invalidate the SHA-256 provenance that makes them
+# evidence, so they are excluded from documentation checks by design.
+DOCS="$(find . -name '*.md' -not -path './.git/*' -not -path './contracts/legacy/*' \
+        -not -path './target/*' | sort)"
 
 SLUG_CACHE_DIR="$(mktemp -d)"
 trap 'rm -rf "$SLUG_CACHE_DIR"' EXIT
