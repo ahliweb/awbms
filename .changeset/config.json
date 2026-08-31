@@ -1,0 +1,28 @@
+{
+  "$comment": "AWBMS changeset configuration. Consumed by scripts/version-bump.sh and validated by scripts/check-docs.sh. Deliberately dependency-free: this repository has no Node or Cargo toolchain yet (see docs/architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md §0.1).",
+  "versionFile": "VERSION",
+  "changelogFile": "CHANGELOG.md",
+  "changesetDir": ".changeset",
+  "tagPrefix": "v",
+  "bumpLevels": ["major", "minor", "patch"],
+  "changeTypes": [
+    "added",
+    "changed",
+    "deprecated",
+    "removed",
+    "fixed",
+    "security"
+  ],
+  "components": [
+    "architecture-validation",
+    "adr",
+    "governance",
+    "versioning",
+    "skills",
+    "scripts",
+    "ci",
+    "contracts",
+    "workspace"
+  ],
+  "preOneZeroPolicy": "While MAJOR is 0 the platform is pre-Blueprint. 1.0.0 is reserved for the first production cutover accepted under §54 Go/No-Go."
+}
