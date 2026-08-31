@@ -1,0 +1,24 @@
+{
+  "gate": "VG-01",
+  "status": "partial-static-source-evidence",
+  "snapshot_date": "2026-08-29",
+  "sources": [
+    {"repository": "ahliweb/awcms", "commit": "11f2e95a47b1328a820f976d60f978c38a067903"},
+    {"repository": "ahliweb/awcms-astro", "commit": "7b753be619244541b817d5d8e7d3b72cfe88d4f9"}
+  ],
+  "files": [
+    {"path": "astro-consumer.json", "sha256": "a6e678ef3c3e1d5c0df01b768da36e46fb0d36a41c44bf0d3b9fec01241ee345"},
+    {"path": "migrations.json", "sha256": "1af7945eaea8e8b578eb25f4a2111da89052476b071f40765955662c49fba442"},
+    {"path": "modules.json", "sha256": "a17bf87b9f44e0f941ea286b3bd29359a3d62e43b5d38f620f8a5d4bc9ed73f9"},
+    {"path": "source/awcms-api-consumer-contract.ts", "sha256": "b191cb19c1a86e4889c4011eadc36c92788487f0e2b3cb688aeae822ca6ad0f1"},
+    {"path": "source/awcms-astro-contract.test.mjs", "sha256": "fd6455396b7fb04a32f29faa36fa38f86d2049321ebc0bf2178ca01706c04f4e"},
+    {"path": "source/awcms-astro-package.json", "sha256": "178fb18df1385024e8553a01a92e3e5fac574d967aa273aaa19def25cfb0711e"},
+    {"path": "source/awcms-ci.yml", "sha256": "6f4879354313daecf919324de1bf132a3a5faa20f0cdb0378cc53ed3c77f6e2b"},
+    {"path": "source/awcms-domain-events.asyncapi.yaml", "sha256": "b661cbe711a38eb17c2db555c00a897779dbd96d1c36c2336604baed8548275a"},
+    {"path": "source/awcms-module-registry.ts", "sha256": "6ace450a85e0181bedc661feae945c84dc333cf3144c1d8d22b6f8e8a1270ef6"},
+    {"path": "source/awcms-package.json", "sha256": "2c356b511640787e3643c0d012994d3ec202ba41f1af19417723d466fba8c365"},
+    {"path": "source/awcms-public-api.openapi.yaml", "sha256": "d72f3eb7298168274a9b8f037d905aa6261381751be7e9079935d7a5615676cf"},
+    {"path": "source/awcms-repo-inventory.md", "sha256": "7e107aa455ea768eb101197cdb72d46d755de22f856e6537c9e030cbf5a64bd5"}
+  ],
+  "remaining_live_evidence": ["controlled PostgreSQL RLS introspection", "controlled PostgreSQL roles/grants introspection", "authorization vectors and representative parity fixtures"]
+}

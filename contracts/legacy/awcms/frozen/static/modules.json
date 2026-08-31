@@ -1,0 +1,30 @@
+{
+  "source_sha": "11f2e95a47b1328a820f976d60f978c38a067903",
+  "count": 24,
+  "modules": [
+    "blog-content",
+    "comments",
+    "data-lifecycle",
+    "domain-event-runtime",
+    "email",
+    "form-drafts",
+    "identity-access",
+    "idn-admin-regions",
+    "logging",
+    "media-library",
+    "module-management",
+    "newsletter",
+    "profile-identity",
+    "push-delivery",
+    "reporting",
+    "seo-distribution",
+    "site-profile",
+    "site-search",
+    "sync-storage",
+    "tenant-admin",
+    "tenant-domain",
+    "theming",
+    "visitor-analytics",
+    "workflow-approval"
+  ]
+}

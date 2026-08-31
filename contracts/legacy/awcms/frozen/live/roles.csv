@@ -1,0 +1,4 @@
+rolname,rolsuper,rolbypassrls,rolcreaterole,rolcreatedb,rolcanlogin
+awcms_app,f,f,f,f,f
+awcms_vg01_owner,f,f,f,f,t
+awcms_worker,f,f,f,f,f

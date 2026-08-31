@@ -1,0 +1,22 @@
+{
+  "source_repository": "ahliweb/awcms",
+  "source_commit": "11f2e95a47b1328a820f976d60f978c38a067903",
+  "migration_runner": "scripts/db-migrate.ts",
+  "migration_count": 148,
+  "source_derived_all_awcms_table_count": 152,
+  "source_derived_rls_count": 134,
+  "source_derived_force_rls_count": 134,
+  "source_derived_non_force_count": 18,
+  "live_all_awcms_table_count": 152,
+  "live_business_table_count_excluding_migration_ledger": 151,
+  "live_migration_ledger_table_count": 1,
+  "live_partitioned_parent_count": 0,
+  "live_rls_enabled_table_count": 134,
+  "live_force_rls_table_count": 134,
+  "live_non_force_all_awcms_table_count": 18,
+  "live_non_force_business_table_count": 17,
+  "policy_count": 143,
+  "runtime_owned_table_count": 0,
+  "role_count": 3,
+  "bad_security_role_count": 0
+}
