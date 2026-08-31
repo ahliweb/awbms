@@ -11,8 +11,8 @@ A gate is **PASS** only when its named evidence exists and its pass/fail rule ca
 | Gate | Objective | Current status | Required evidence | Pass rule |
 |---|---|---|---|---|
 | `VG-01` | Freeze AWCMS/AWCMS-Astro source-of-truth inputs | **PARTIAL** | provenance manifest, machine-generated inventories, contracts, authorization vectors, live DB RLS/role evidence where required | all required artifacts exist under `contracts/legacy/awcms/`, include source SHA + digest, and are consumed by checks/tests |
-| `VG-03` | Resolve/pin Rust toolchain | **OPEN** | `rust-toolchain.toml`, build output, CI evidence | exact stable toolchain builds the verification workspace in CI |
-| `VG-04` | Validate Axum/Tokio/SQLx/PostgreSQL fit | **OPEN** | minimal verification spike + PostgreSQL integration tests | tenant transaction context, non-superuser RLS denial, request lifecycle, SQLx behavior, timeouts/shutdown all pass |
+| `VG-03` | Resolve/pin Rust toolchain | **PASS** | exact `rust-toolchain.toml`, committed `Cargo.lock`, read-only CI with `--locked` | evidence recorded in `evidence/VG-03-VG-04-2026-08-29.md`; final CI verifies the committed graph and leaves the lockfile unchanged |
+| `VG-04` | Validate Axum/Tokio/SQLx/PostgreSQL fit | **PASS** | minimal verification spike + real PostgreSQL integration tests | evidence recorded in `evidence/VG-03-VG-04-2026-08-29.md`; request lifecycle, graceful shutdown, tenant-local SQLx transaction context and non-superuser FORCE-RLS denial pass |
 | `VG-05` | Correctness/security parity | **OPEN** | golden request/response/DB/auth/audit/event corpus | committed compatibility scope has no unexplained semantic diff |
 | `VG-09` | Establish performance evidence | **OPEN** | reproducible benchmark corpus + environment manifest | measurements are repeatable and satisfy approved baseline/no-regression policy |
 | `VG-12` | Prove recovery/rollback | **OPEN** | backup/restore + cutover rollback rehearsal | restore and routing/worker rollback complete within approved recovery criteria |
@@ -48,15 +48,15 @@ These baselines are starting evidence only. A future inventory refresh MUST inte
 ## Gate Sequencing
 
 ```text
-VG-01 source inventory
+VG-01 source inventory (PARTIAL)
        |
        +----> Stage-1 decisions validated against reality
        |
-VG-03 toolchain pin
+VG-03 toolchain pin (PASS)
        |
-VG-04 verification spike
+VG-04 verification spike (PASS)
        |
-       +----> Stage 1 may be signed off
+       +----> Stage 1 may be signed off only after VG-01 + assumptions/approval
                  |
                  v
              Stage 2 PRD
@@ -71,5 +71,7 @@ VG-15 independence (continuous)
 ## Stage-1 Sign-Off Rule
 
 Stage 1 MUST remain `IN PROGRESS` while any Blueprint-blocking assumption is unresolved or while `VG-01`, `VG-03`, or `VG-04` is not PASS.
+
+`VG-03` and `VG-04` are now PASS. Stage 1 still remains `IN PROGRESS` because `VG-01` is partial and the remaining assumption/approval conditions must be closed.
 
 No later implementation result retroactively substitutes for missing Stage-1 evidence; findings must update the Blueprint and decision register explicitly.

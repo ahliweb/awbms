@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "gate": "VG-01",
-  "status": "partial",
+  "status": "partial-frozen-evidence",
   "generatedAt": "2026-08-29",
   "sources": [
     {
@@ -17,89 +17,58 @@
       "role": "concrete-public-consumer-contract-reference"
     }
   ],
-  "sourceEvidence": [
-    {
-      "repository": "ahliweb/awcms",
-      "path": "src/modules/index.ts",
-      "gitBlobSha": "842d263663ec5423bd9b05cfd2a5def0cbe47605",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "module-registry-source"
-    },
-    {
-      "repository": "ahliweb/awcms",
-      "path": "docs/awcms/repo-inventory.md",
-      "gitBlobSha": "6515dcc87503c2ee6e1ef709103c9ebef3628ec9",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "generated-repository-inventory"
-    },
-    {
-      "repository": "ahliweb/awcms",
-      "path": "scripts/api-consumer-contract.ts",
-      "gitBlobSha": "cbee1706c5dc3b13e84af82450053aaa89b56805",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "backend-consumer-contract-source"
-    },
-    {
-      "repository": "ahliweb/awcms",
-      "path": "openapi/awcms-public-api.openapi.yaml",
-      "gitBlobSha": "5383a3affefedd8cfbf8d313729f928f808999b0",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "bundled-public-openapi-contract"
-    },
-    {
-      "repository": "ahliweb/awcms",
-      "path": "asyncapi/awcms-domain-events.asyncapi.yaml",
-      "gitBlobSha": "a8c2d890809458663ad181f148346d630a99f912",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "domain-event-asyncapi-contract"
-    },
-    {
-      "repository": "ahliweb/awcms-astro",
-      "path": "tests/kontrak-awcms.test.mjs",
-      "gitBlobSha": "f27f77e5b3962815c09ec3bf1a89abf8fb5baba5",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "consumer-side-contract-and-tenant-behavior-tests"
-    },
-    {
-      "repository": "ahliweb/awcms-astro",
-      "path": "package.json",
-      "gitBlobSha": "18a5435825b24ff5f9a40c02ed717bdcb1cf4885",
-      "sha256": null,
-      "status": "observed-not-yet-frozen",
-      "purpose": "consumer-version-and-runtime-state"
-    }
-  ],
+  "frozenEvidence": {
+    "commit": "63951fec84440f01d97dc0c32b4344d71ce0d222",
+    "root": "contracts/legacy/awcms/frozen",
+    "verification": "tools/vg01_verify_frozen.sh",
+    "provenance": "contracts/legacy/awcms/frozen/provenance.json",
+    "staticManifest": "contracts/legacy/awcms/frozen/static/manifest.sha256",
+    "liveManifest": "contracts/legacy/awcms/frozen/live/manifest.sha256"
+  },
   "verifiedStaticSummary": {
     "registeredModules": 24,
     "migrations": 148,
-    "awcmsTables": 152,
+    "allAwcmsTablesIncludingMigrationLedger": 152,
+    "businessTablesExcludingMigrationLedger": 151,
+    "migrationLedgerTables": 1,
     "forceRlsTables": 134,
-    "rlsFreeGlobalTables": 18,
+    "nonForceAwcmsTablesIncludingMigrationLedger": 18,
+    "nonForceBusinessTables": 17,
     "testFiles": 507,
     "routeFiles": 388,
     "adrs": 240,
     "astroConsumedPaths": 13,
     "astroCommittedFuturePaths": 2
   },
+  "verifiedLiveSummary": {
+    "postgres": "18.6",
+    "migrationLedgerEntries": 148,
+    "allAwcmsTablesIncludingMigrationLedger": 152,
+    "businessTablesExcludingMigrationLedger": 151,
+    "rlsEnabledTables": 134,
+    "forceRlsTables": 134,
+    "policies": 143,
+    "runtimeOwnedTables": 0,
+    "badSecurityRoles": 0
+  },
   "requiredArtifacts": [
-    {"id": "modules", "status": "pending-freeze"},
-    {"id": "migrations-with-sha256", "status": "pending"},
-    {"id": "tables-rls", "status": "pending"},
-    {"id": "live-roles-grants", "status": "pending"},
-    {"id": "routes-auth-ownership", "status": "pending"},
-    {"id": "openapi", "status": "source-pinned-pending-freeze"},
-    {"id": "asyncapi", "status": "source-pinned-pending-freeze"},
-    {"id": "architectural-gates", "status": "pending"},
-    {"id": "authorization-vectors", "status": "pending"},
-    {"id": "astro-consumer-contract", "status": "pending-freeze"},
-    {"id": "representative-behavior-fixtures", "status": "pending"},
-    {"id": "artifact-usage-check", "status": "pending"}
+    {"id":"modules","status":"frozen-and-verified"},
+    {"id":"migrations-with-sha256","status":"frozen-and-verified"},
+    {"id":"tables-rls","status":"frozen-and-verified"},
+    {"id":"live-roles-grants","status":"frozen-and-verified"},
+    {"id":"routes-auth-ownership","status":"pending-structured-inventory"},
+    {"id":"openapi","status":"frozen-and-verified"},
+    {"id":"asyncapi","status":"frozen-and-verified"},
+    {"id":"architectural-gates","status":"source-frozen-pending-structured-inventory"},
+    {"id":"authorization-vectors","status":"frozen-register-pending-parity-execution"},
+    {"id":"astro-consumer-contract","status":"frozen-and-verified"},
+    {"id":"representative-behavior-fixtures","status":"pending"},
+    {"id":"artifact-usage-check","status":"implemented-for-current-frozen-corpus"}
   ],
-  "passRule": "VG-01 remains non-PASS until the re-runnable generator, SHA-256 frozen artifacts, controlled live PostgreSQL evidence where required, and artifact-consumer checks all exist and pass."
+  "remainingBlockers": [
+    "structured route ownership/auth classification inventory",
+    "structured architectural gate inventory",
+    "representative executable behavior/parity fixtures consuming authorization vectors"
+  ],
+  "passRule": "VG-01 remains non-PASS until every required artifact is frozen with provenance/digest and is consumed by a deterministic check or parity test."
 }

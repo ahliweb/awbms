@@ -1,0 +1,192 @@
+name: AWBMS verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: awbms-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  vg03-vg04:
+    name: VG-03 / VG-04 Rust + PostgreSQL verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_ci_password
+      POSTGRES_DB: awbms
+      ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/awbms
+      AWBMS_TEST_DATABASE_URL: postgres://awbms_app_vg04:awbms_vg04_ci_password@127.0.0.1:5432/awbms
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: awbms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d awbms"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.98.0
+          rustc --version
+          cargo --version
+
+      - name: Verify VG-15 repository independence
+        run: |
+          rustc --edition 2024 -D warnings --test tools/vg15_independence.rs -o /tmp/vg15-test
+          /tmp/vg15-test
+          rustc --edition 2024 -D warnings tools/vg15_independence.rs -o /tmp/vg15
+          /tmp/vg15 .
+
+      - name: Checkout pinned AWCMS source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms
+          ref: 11f2e95a47b1328a820f976d60f978c38a067903
+          path: .legacy/awcms
+          persist-credentials: false
+
+      - name: Checkout pinned AWCMS-Astro source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms-astro
+          ref: 7b753be619244541b817d5d8e7d3b72cfe88d4f9
+          path: .legacy/awcms-astro
+          persist-credentials: false
+
+      - name: Verify deterministic VG-01 static inventory generator
+        run: |
+          rustc --edition 2024 -D warnings --test tools/vg01_inventory.rs -o /tmp/vg01-test
+          /tmp/vg01-test
+          rustc --edition 2024 -D warnings tools/vg01_inventory.rs -o /tmp/vg01
+          /tmp/vg01 .legacy/awcms .legacy/awcms-astro /tmp/vg01-a
+          /tmp/vg01 .legacy/awcms .legacy/awcms-astro /tmp/vg01-b
+          diff -ru /tmp/vg01-a /tmp/vg01-b
+          grep -F '"count": 24' /tmp/vg01-a/modules.json
+          grep -F '"count": 148' /tmp/vg01-a/migrations.json
+          grep -F '"status": "partial-static-source-evidence"' /tmp/vg01-a/manifest.json
+
+      - name: Verify frozen VG-01 evidence when present
+        run: |
+          if [[ -d contracts/legacy/awcms/frozen ]]; then
+            bash tools/vg01_verify_frozen.sh contracts/legacy/awcms
+          else
+            echo "Frozen VG-01 corpus not committed yet; gate remains PARTIAL"
+          fi
+
+      - name: Upload deterministic VG-01 static evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vg01-static-source-evidence
+          path: /tmp/vg01-a/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Verify committed dependency graph
+        run: cargo metadata --locked --format-version 1 --no-deps >/dev/null
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Prepare least-privilege RLS fixture
+        run: psql "$ADMIN_DATABASE_URL" -f tests/fixtures/vg04_rls.sql
+
+      - name: Unit and PostgreSQL integration tests
+        run: cargo test --locked --workspace --all-targets
+
+      - name: Lockfile remains unchanged
+        run: git diff --exit-code -- Cargo.lock
+
+  vg01-live-awcms-db:
+    name: VG-01 controlled AWCMS PostgreSQL introspection
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_ci_password
+      POSTGRES_DB: postgres
+      ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/postgres
+      TARGET_ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/awcms_vg01
+      OWNER_DATABASE_URL: postgres://awcms_vg01_owner:awcms_vg01_owner_fixture_password@127.0.0.1:5432/awcms_vg01
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout AWBMS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Checkout pinned AWCMS source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms
+          ref: 11f2e95a47b1328a820f976d60f978c38a067903
+          path: .legacy/awcms
+          persist-credentials: false
+
+      - name: Install pinned AWCMS dependencies
+        working-directory: .legacy/awcms
+        run: bun install --frozen-lockfile
+
+      - name: Run real AWCMS migrations and introspect live PostgreSQL
+        run: |
+          bash tools/vg01_live_db.sh \
+            .legacy/awcms \
+            "$ADMIN_DATABASE_URL" \
+            "$OWNER_DATABASE_URL" \
+            "$TARGET_ADMIN_DATABASE_URL" \
+            /tmp/vg01-live
+
+      - name: Upload controlled live DB evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vg01-live-awcms-db-evidence
+          path: /tmp/vg01-live/
+          retention-days: 14
+          if-no-files-found: error

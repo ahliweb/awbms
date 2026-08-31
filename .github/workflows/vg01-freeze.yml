@@ -1,0 +1,139 @@
+name: Freeze VG-01 legacy evidence
+
+on:
+  push:
+    branches: [chore/3-vg01-legacy-inventory]
+    paths:
+      - .github/workflows/vg01-freeze.yml
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_ci_password
+      POSTGRES_DB: postgres
+      ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/postgres
+      TARGET_ADMIN_DATABASE_URL: postgres://postgres:postgres_ci_password@127.0.0.1:5432/awcms_vg01
+      OWNER_DATABASE_URL: postgres://awcms_vg01_owner:awcms_vg01_owner_fixture_password@127.0.0.1:5432/awcms_vg01
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout AWBMS write target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: chore/3-vg01-legacy-inventory
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup override set 1.98.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Checkout pinned AWCMS source without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms
+          ref: 11f2e95a47b1328a820f976d60f978c38a067903
+          path: .legacy/awcms
+          persist-credentials: false
+
+      - name: Checkout pinned AWCMS-Astro source without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ahliweb/awcms-astro
+          ref: 7b753be619244541b817d5d8e7d3b72cfe88d4f9
+          path: .legacy/awcms-astro
+          persist-credentials: false
+
+      - name: Install pinned AWCMS dependencies
+        working-directory: .legacy/awcms
+        run: bun install --frozen-lockfile
+
+      - name: Regenerate and verify static evidence
+        run: |
+          rustc --edition 2024 -D warnings tools/vg01_inventory.rs -o /tmp/vg01
+          /tmp/vg01 .legacy/awcms .legacy/awcms-astro /tmp/vg01-static-a
+          /tmp/vg01 .legacy/awcms .legacy/awcms-astro /tmp/vg01-static-b
+          diff -ru /tmp/vg01-static-a /tmp/vg01-static-b
+          (
+            cd /tmp/vg01-static-a
+            find . -type f ! -name manifest.sha256 -print0 | sort -z | xargs -0 sha256sum > manifest.sha256
+            sha256sum -c manifest.sha256
+          )
+
+      - name: Regenerate and verify controlled live PostgreSQL evidence
+        run: |
+          bash tools/vg01_live_db.sh \
+            .legacy/awcms \
+            "$ADMIN_DATABASE_URL" \
+            "$OWNER_DATABASE_URL" \
+            "$TARGET_ADMIN_DATABASE_URL" \
+            /tmp/vg01-live
+
+      - name: Freeze reviewed corpus under contracts only
+        env:
+          FREEZE_SOURCE_SHA: ${{ github.sha }}
+          FREEZE_RUN_ID: ${{ github.run_id }}
+        run: |
+          rm -rf contracts/legacy/awcms/frozen
+          mkdir -p contracts/legacy/awcms/frozen/static contracts/legacy/awcms/frozen/live
+          cp -a /tmp/vg01-static-a/. contracts/legacy/awcms/frozen/static/
+          cp -a /tmp/vg01-live/. contracts/legacy/awcms/frozen/live/
+          cat > contracts/legacy/awcms/frozen/provenance.json <<JSON
+          {
+            "gate": "VG-01",
+            "freezeSourceAwbmsCommit": "$FREEZE_SOURCE_SHA",
+            "freezeWorkflowRunId": "$FREEZE_RUN_ID",
+            "awcms": "11f2e95a47b1328a820f976d60f978c38a067903",
+            "awcmsAstro": "7b753be619244541b817d5d8e7d3b72cfe88d4f9",
+            "postgres": "18.6",
+            "bun": "1.3.14",
+            "rust": "1.98.0"
+          }
+          JSON
+          rm -rf .legacy
+          bash tools/vg01_verify_frozen.sh contracts/legacy/awcms
+
+          git add contracts/legacy/awcms/frozen
+          changed=$(git diff --cached --name-only)
+          if [[ -z "$changed" ]]; then
+            echo "Frozen corpus already matches regenerated evidence"
+            exit 0
+          fi
+          if echo "$changed" | grep -Ev '^contracts/legacy/awcms/frozen/' | grep -q .; then
+            echo "Refusing write outside frozen VG-01 evidence path" >&2
+            echo "$changed" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(vg-01): freeze legacy evidence corpus (#3)"
+          git push origin HEAD:chore/3-vg01-legacy-inventory

@@ -1,0 +1,23 @@
+{
+  "awcms_source_sha": "11f2e95a47b1328a820f976d60f978c38a067903",
+  "astro_source_sha": "7b753be619244541b817d5d8e7d3b72cfe88d4f9",
+  "consumed": [
+    {"path": "/api/v1/analytics/collect", "execution_class": "browser-anonymous-cross-origin-telemetry-write"},
+    {"path": "/api/v1/blog/menus", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/blog/posts", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/blog/terms", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/blog/widgets", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/media/objects", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/media/public-origin", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/newsletter/confirm", "execution_class": "browser-anonymous-cross-origin-security-sensitive-write"},
+    {"path": "/api/v1/newsletter/subscribe", "execution_class": "browser-anonymous-cross-origin-security-sensitive-write"},
+    {"path": "/api/v1/newsletter/unsubscribe", "execution_class": "browser-anonymous-cross-origin-security-sensitive-write"},
+    {"path": "/api/v1/site-profile/composed", "execution_class": "build-time-machine-authenticated-read"},
+    {"path": "/api/v1/site-search/query", "execution_class": "browser-anonymous-cross-origin-read"},
+    {"path": "/api/v1/site-search/suggest", "execution_class": "browser-anonymous-cross-origin-read"}
+  ],
+  "committed": [
+    {"path": "/api/v1/access/machine-credentials", "execution_class": "future-consumer-contract"},
+    {"path": "/api/v1/auth/session", "execution_class": "future-consumer-contract"}
+  ]
+}

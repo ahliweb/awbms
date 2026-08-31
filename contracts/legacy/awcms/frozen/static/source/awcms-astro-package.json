@@ -1,0 +1,56 @@
+{
+  "name": "awcms-astro",
+  "type": "module",
+  "version": "0.4.0",
+  "private": false,
+  "description": "AWCMS family template for public static sites on Astro, integrated with ahliweb/awcms as its content backend.",
+  "homepage": "https://github.com/ahliweb/awcms-astro",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahliweb/awcms-astro.git"
+  },
+  "license": "MIT",
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "scripts": {
+    "dev": "bun --bun astro dev",
+    "build": "bun run check && bun --bun astro build && bun run build:penyaji && bun run build:asal-media && bun run build:asal-pencarian",
+    "build:penyaji": "bun build server/penyaji.mjs --target=bun --outfile dist/server/penyaji.mjs",
+    "check": "bun run check:lockfile && bun --bun astro check",
+    "check:lockfile": "bun scripts/cek-lockfile.mjs",
+    "audit:konten": "bun scripts/audit-konten.mjs",
+    "audit:dokumen": "bun scripts/audit-dokumen.mjs",
+    "audit:graf": "bun scripts/audit-graf.mjs",
+    "audit:aset": "bun scripts/audit-aset.mjs",
+    "audit:serapan": "bun scripts/audit-serapan.mjs",
+    "audit:rilis": "bun scripts/audit-rilis.mjs",
+    "ukur:skala": "bun scripts/ukur-skala-build.mjs",
+    "audit:translation": "bun scripts/check-docs-translation.mjs",
+    "docs:i18n:stamp": "bun scripts/docs-i18n-stamp.mjs",
+    "test": "bun test",
+    "serve": "bun dist/server/penyaji.mjs",
+    "start": "bun run serve",
+    "preview": "bun run serve",
+    "release": "bun scripts/rilis.mjs",
+    "sbom": "bun scripts/sbom.mjs",
+    "build:asal-media": "bun scripts/asal-media.mjs",
+    "build:asal-pencarian": "bun scripts/asal-pencarian.mjs"
+  },
+  "overrides": {
+    "fast-uri": "^3.1.5",
+    "nanoid": "^3.3.18"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/node": "^11.1.4",
+    "@astrojs/sitemap": "^3.7.3",
+    "astro": "^7.2.4",
+    "compression": "^1.8.1",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0"
+  }
+}
