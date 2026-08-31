@@ -4,11 +4,11 @@
 |---|---|
 | Project | AWBMS — AhliWeb Backend Management System |
 | Repository | `ahliweb/awbms` |
-| Document version | 1.1 |
+| Specification version | v0.2.0 |
 | Status | Architecture validation — **conditionally approved** to enter Stage 1 (see [§49](#49-master-blueprint-entry-conditions) and [Appendix F](#appendix-f--approval-record)) |
 | Original validation date | 2026-08-29 |
-| Last revision | 2026-08-29 (rigor/traceability revision; no architectural decision reversed) |
-| Evidence basis | This repository at commit `5f8f9aa` + external claims recorded by the original validation (not re-verified here) |
+| Last revision | 2026-08-31 (register completion and defect correction; no architectural decision reversed) |
+| Evidence basis | This repository at the version above, re-derived by `scripts/check-docs.sh`, plus external claims recorded by the original validation (not re-verified here) |
 | Decision scope | Rust-based backend architecture, ecosystem selection, scalability, maintainability, security, AWCMS compatibility, migration strategy |
 | Explicitly out of scope | Product requirements, UX, pricing/commercial strategy, org/staffing, per-module functional design, SLO target values |
 | Owner / approver | *unassigned — see [Appendix F](#appendix-f--approval-record)* |
@@ -20,7 +20,9 @@
 
 ### 0.1 Repository state (verified)
 
-**[F]** At commit `5f8f9aa` the `ahliweb/awbms` repository contains exactly one tracked file — this document. There is no Rust code, no `Cargo.toml`, `Cargo.lock` or `rust-toolchain.toml`, no `migrations/`, no `contracts/` directory, no git submodule and no CI configuration.
+**[F]** The `ahliweb/awbms` repository contains **no Rust code**. There is no `Cargo.toml`, `Cargo.lock` or `rust-toolchain.toml`, no `migrations/` directory, no `contracts/` directory, and no git submodule. What it does contain, besides this document, is governance material: a README, contribution rules, three ADRs, the version and changeset system ([§0.5](#05-document-control)), three Claude Code skills, and the shell scripts that check them.
+
+> **This statement is machine-checked, not hand-maintained.** The original version of this section named a commit SHA and asserted a file count, which is a fact that decays on the next commit — and which a commit cannot state about itself. The Rust-absence half of the claim above is now re-derived on every push by `scripts/check-docs.sh`, and the repository-independence half is gate `VG-15`. A reader who wants the current state should run the script rather than trust this paragraph.
 
 Two consequences follow, and they govern the whole document:
 
@@ -29,7 +31,7 @@ Two consequences follow, and they govern the whole document:
 
 ### 0.2 Claim labels
 
-Statements are labelled where their epistemic status matters. Unlabelled prose in [§4](#4-rust-ecosystem-validation)–[§56](#56-monitoring-baseline) is design recommendation, equivalent to **[R]**.
+Statements are labelled where their epistemic status matters. Unlabelled prose in [§4](#4-rust-ecosystem-validation)–[§58](#58-final-recommendation) is design recommendation, equivalent to **[R]**. (The range previously stopped at §56, silently leaving §57 and §58 unclassified.)
 
 | Label | Meaning | Register |
 |---|---|---|
@@ -43,20 +45,42 @@ Statements are labelled where their epistemic status matters. Unlabelled prose i
 
 ### 0.3 Normative language
 
-`MUST`, `MUST NOT`, `SHALL` and `MUST` in capitals carry RFC 2119 / RFC 8174 force. Lowercase "should", "must" and "may" in the discussion sections are ordinary prose and carry **no** normative force — normative force lives in the decision register ([Appendix C](#appendix-c--decision-register)) and the gate register ([Appendix E](#appendix-e--verification-gate-register)). This split is deliberate: it keeps the discussion readable while making the binding surface small enough to review and audit.
+`MUST`, `MUST NOT`, `REQUIRED`, `SHALL`, `SHALL NOT`, `SHOULD`, `SHOULD NOT`, `RECOMMENDED`, `MAY` and `OPTIONAL` in capitals carry RFC 2119 / RFC 8174 force. (The original list named `MUST` twice and omitted the permissive keywords entirely, which left capitalised `SHOULD` and `MAY` undefined in a document that uses both.) Lowercase "should", "must" and "may" in the discussion sections are ordinary prose and carry **no** normative force — normative force lives in the decision register ([Appendix C](#appendix-c--decision-register)) and the gate register ([Appendix E](#appendix-e--verification-gate-register)). This split is deliberate: it keeps the discussion readable while making the binding surface small enough to review and audit.
 
 ### 0.4 Validation status at a glance
 
 | Category | Count | Where |
 |---|---:|---|
-| Facts verified against this repository | 3 | [§0.1](#01-repository-state-verified), [§3.1](#31-current-state-verified) |
-| Recorded external claims awaiting verification | See Appendix A | [Appendix A](#appendix-a--recorded-external-claims) |
-| Assumptions | See Appendix B | [Appendix B](#appendix-b--assumption-register) |
-| Binding decisions | See Appendix C | [Appendix C](#appendix-c--decision-register) |
-| Open decisions blocking the Blueprint | See Appendix D | [Appendix D](#appendix-d--open-decision-register) |
-| Verification gates | See Appendix E | [Appendix E](#appendix-e--verification-gate-register) |
+| Facts verified against this repository | 4 | [§0.1](#01-repository-state-verified), [§3.1](#31-current-state-verified) (×2), [§23](#23-performance-expectations) |
+| Recorded external claims awaiting verification | 7 | [Appendix A](#appendix-a--recorded-external-claims) |
+| Assumptions | 8 | [Appendix B](#appendix-b--assumption-register) |
+| Binding decisions | 32 | [Appendix C](#appendix-c--decision-register) |
+| Open decisions — total | 9 | [Appendix D](#appendix-d--open-decision-register) |
+| Open decisions blocking Blueprint sign-off | 6 | [Appendix D](#appendix-d--open-decision-register) |
+| Verification gates | 16 | [Appendix E](#appendix-e--verification-gate-register) |
+| Verification gates discharged | **0** | [Appendix E](#appendix-e--verification-gate-register) |
+
+The last row is the one that matters. Sixteen gates are defined; none has produced evidence. Every count above describes the *structure* of the validation, not its confirmation.
 
 **What this validation does and does not establish.** It establishes that a coherent, internally consistent Rust architecture *can* be specified for AWBMS, and it records the trade-off reasoning for each major selection. It does **not** establish that the selected crates meet AWBMS requirements under load, that AWCMS behavior has been inventoried, or that migration is feasible on any particular schedule. Those are the open items in Appendices A, D and E.
+
+### 0.5 Document control
+
+**[D]** This document is versioned as part of the repository, not separately (`AD-31`). The header's *Specification version* field is written by `scripts/version-bump.sh` and is mechanically asserted equal to the root `VERSION` file and the latest `CHANGELOG.md` section.
+
+This replaces the standalone `Document version` field carried by revisions up to 1.1. That field versioned one file inside a repository that had no version of its own, which is the drift pattern [§2.1](#21-documentation-drift-warning) argues against: two independently maintained version numbers for one artifact, with nothing keeping them honest.
+
+**[D]** The structural invariants of this document are enforced by an executable gate rather than by review attention (`AD-32`, `VG-16`). `scripts/check-docs.sh` verifies that every `AD-`, `OD-`, `VG-`, `C-` and `AS-` identifier referenced here resolves to a register row, that no register row has outlived every reference to it, that every internal anchor resolves, and that the repository has acquired no dependency on AWCMS (`VG-15`).
+
+The gate is binding about *form* and silent about *content*. It can confirm that `AD-04` exists, is defined once and is cited; it cannot confirm that `AD-04` is a good decision. Reviewers retain that job — the gate exists so they can spend attention on it.
+
+| Change to this document | Version effect |
+|---|---|
+| A binding decision is reversed or superseded | MAJOR |
+| A decision, gate, assumption or claim is added | MINOR |
+| A correction that changes no conclusion | PATCH |
+
+The full policy, including the `0.x` rule and the reservation of `1.0.0` for the first accepted production cutover, is `docs/versioning/VERSIONING.md`.
 
 ---
 
@@ -179,6 +203,8 @@ Before migration work begins, AWBMS MUST generate and freeze a machine-verifiabl
 | OpenAPI + AsyncAPI documents | contract files as committed | `C-03` |
 | Architectural gate list, each marked enforced / advisory / absent | CI configuration + gate scripts | `C-04`, `C-05` |
 | Authorization vectors (principal × resource × expected decision) | executable authorization tests | — |
+| Rate-limit and abuse-control dimensions per endpoint class | rate-limit implementation and its tests | `C-07` |
+| Password and machine-credential storage formats in use | authentication implementation | — |
 
 Each artifact MUST be stored under `contracts/legacy/awcms/` with the provenance fields required by [§3](#3-repository-independence). Once frozen, the inventory — not this section — is the requirements baseline.
 
@@ -190,9 +216,9 @@ Each artifact MUST be stored under `contracts/legacy/awcms/` with the provenance
 
 ### 3.1 Current state (verified)
 
-**[F]** At commit `5f8f9aa` this repository has **no** dependency on AWCMS of any kind: no git submodule, no `.gitmodules`, no Cargo manifest and therefore no path or git dependency, and no vendored AWCMS source. Independence is currently a fact, not merely an intention — the gate `VG-15` exists to keep it one once a build is introduced.
+**[F]** This repository has **no** dependency on AWCMS of any kind: no git submodule, no `.gitmodules`, no Cargo manifest and therefore no path or git dependency, and no vendored AWCMS source. Independence is currently a fact, not merely an intention — and unlike the original statement of it, which named a commit and aged immediately, it is now re-checked on every push by `scripts/check-docs.sh` under gate `VG-15`.
 
-**[F]** Equally, `contracts/legacy/awcms/` does not yet exist. The fixture pipeline described below is entirely prospective.
+**[F]** Equally, `contracts/legacy/awcms/` does not yet exist. The fixture pipeline described below is entirely prospective, and `VG-01` is the gate that would make it real.
 
 ### 3.2 Prohibited couplings
 
@@ -512,7 +538,7 @@ Likely future candidates, if measured:
 - notification delivery;
 - analytics ingestion;
 - report/export generation;
-- large-scale indexing/search.
+- large-scale indexing/search — note that whether search stays in PostgreSQL (`tsvector`/GIN/`pg_trgm`) or moves to a dedicated index is itself unresolved (`OD-07`), and the answer changes whether this is an extraction candidate at all.
 
 AWBMS should therefore be **microservice-extractable, not microservice-first**.
 
@@ -623,7 +649,7 @@ data ownership
 lifecycle/subject-data descriptors
 ```
 
-The registry must be explicit and reviewed at compile time, not populated by runtime plugin discovery.
+**[D]** The registry must be explicit and reviewed at compile time, not populated by runtime plugin discovery (`AD-08`). Runtime discovery would make the module set a deployment-time property, which defeats every gate below: a DAG that is only known at startup cannot be checked in CI.
 
 Required architectural gates:
 
@@ -638,7 +664,7 @@ Required architectural gates:
 
 ### 10.1 One-table-one-writer principle
 
-A mutable table should have one authoritative module owner.
+**[D]** A mutable table has exactly one authoritative module owner (`AD-09`).
 
 Other modules should interact through:
 
@@ -694,6 +720,8 @@ PostgreSQL FORCE RLS
 ```
 
 RLS is a defense layer, not an excuse to omit tenant predicates.
+
+This design assumes the tenant is the isolation unit, with no requirement for sub-tenant partitions or deliberate cross-tenant data sharing (`AS-05`). A product requirement for either would change the policy model rather than merely extend it. The isolation evidence is gate `VG-06`.
 
 ### 11.3 Tenant transaction wrapper
 
@@ -768,9 +796,11 @@ JWT remains appropriate where required by external protocols such as OIDC.
 
 ### 12.1 Password hashing
 
-Use Argon2id for new AWBMS-native password storage unless a reviewed compatibility requirement dictates otherwise.
+**[D]** Use Argon2id for new AWBMS-native password storage unless a reviewed compatibility requirement dictates otherwise (`AD-12`).
 
 During AWCMS migration, AWBMS should support the existing password format and opportunistically rehash on successful authentication rather than forcing all users to reset passwords.
+
+> **[O] `OD-03`** — *which* legacy formats and credential shapes AWBMS must accept is undecided, and it cannot be decided from this document: it depends on what `VG-01` finds in the AWCMS implementation. The scope chosen determines how much compatibility surface [§36](#36-awcms-compatibility-architecture) carries and how large the parity corpus in [§39](#39-awcms--awbms-parity-harness) must be, so it blocks Blueprint sign-off.
 
 ### 12.2 Machine credentials
 
@@ -830,6 +860,8 @@ Rules:
 - no scattered `is_admin` bypasses;
 - platform-scoped actions cannot be silently seeded into tenant roles;
 - assignment-time and action-time SoD checks should both exist where required.
+
+That every protected operation actually passes this chokepoint — rather than most of them, with the exceptions undocumented — is gate `VG-07`.
 
 ---
 
@@ -924,7 +956,7 @@ A given logical job must have a single runtime owner during migration; AWCMS and
 
 ## 17. External I/O rule
 
-External provider HTTP calls should not execute while a business database transaction is being held open unless a formally reviewed algorithm requires it.
+**[D]** External provider HTTP calls MUST NOT execute while a business database transaction is being held open, unless a formally reviewed algorithm requires it (`AD-15`).
 
 Preferred design:
 
@@ -952,7 +984,7 @@ Benefits:
 
 ## 18. Outbound HTTP/TLS
 
-Use Reqwest with rustls and explicit feature configuration.
+**[D]** Use Reqwest with rustls and explicit feature configuration (`AD-16`).
 
 Do not depend implicitly on whichever TLS backend transitive Cargo features happen to select.
 
@@ -975,6 +1007,8 @@ No provider error response should leak secrets into application logs or client-f
 ## 19. Object storage
 
 Domain logic should depend on an AWBMS storage port rather than directly on Cloudflare-specific APIs.
+
+The port design assumes the providers AWBMS depends on offer the capabilities it asks of them — presigned upload/download from R2, a deliverable email path, a push transport, and an OIDC provider where federation is required (`AS-07`). Each is plausible and none is confirmed.
 
 Example interface responsibilities:
 
@@ -1069,6 +1103,8 @@ Required gates include:
 - consumer-contract coverage;
 - backward compatibility checks for committed/consumed APIs.
 
+Conformance between the specified and implemented route sets is gate `VG-08`; it is the check that keeps "contract-first" from degrading into "contract-alongside".
+
 ### 21.2 AsyncAPI
 
 Use:
@@ -1152,6 +1188,10 @@ than in pure framework routing.
 
 Therefore the project should optimize **end-to-end business flows**, not benchmark headlines.
 
+This rests on an assumption about workload shape: that AWBMS requests are dominated by database and authorization work rather than by framework routing (`AS-04`). If a real workload turns out to be routing-bound or serialization-bound, the reasoning behind `AD-04` weakens considerably, because that reasoning explicitly discounts raw HTTP throughput.
+
+**[O] `OD-06`** — no SLO target exists for any capability. [§49.2](#492-blueprint-contents) lists SLOs as Blueprint content, and `OD-04` cannot set benchmark acceptance thresholds without them: a threshold is meaningless until someone states what the system is required to achieve.
+
 ### 23.1 Required benchmark corpus
 
 At minimum benchmark:
@@ -1222,6 +1262,8 @@ PostgreSQL
 
 Do not introduce sticky sessions unless a specific feature requires them.
 
+The single-region, single-primary topology sketched here assumes no availability requirement forces multi-region or active-active deployment in v1 (`AS-06`). That assumption is cheap to hold now and expensive to discover false later, because active-active would reopen `AD-05` — a single authoritative PostgreSQL primary is what most of this architecture's transactional guarantees rest on.
+
 ---
 
 ## 25. PostgreSQL connection scaling
@@ -1264,7 +1306,7 @@ AhliWeb-owned AWBMS crates should initially use:
 
 where practical.
 
-Any future need for unsafe Rust requires:
+This is binding as `AD-29`. Any future need for unsafe Rust requires:
 
 - explicit ADR;
 - narrow isolation;
@@ -1294,6 +1336,8 @@ reviewed automated update PRs
 ```
 
 Do not assume that using a memory-safe language makes third-party dependencies trustworthy.
+
+Evidence that these controls run, rather than merely appear in a list, is gate `VG-13`.
 
 ---
 
@@ -1364,7 +1408,7 @@ Internal errors should retain correlation information without exposing:
 - private network locations;
 - sensitive object metadata.
 
-A standard `ApiError` contract should be defined before module implementation.
+**[D]** A standard `ApiError` envelope and a stable client-facing error code taxonomy MUST be defined before module implementation begins (`AD-21`). Defining it afterwards means retrofitting every handler already written, and error shape is a published contract under `AD-19` whether or not anyone intended it to be.
 
 ---
 
@@ -1391,7 +1435,7 @@ Where overload occurs, return predictable retryable responses rather than allowi
 
 ## 31. Idempotency
 
-Idempotency should be a reusable platform capability for high-risk or retry-prone mutations.
+**[D]** Idempotency is a reusable platform capability, not a per-module concern, and applies to high-risk or retry-prone mutations (`AD-23`). Evidence is gate `VG-11`.
 
 Example:
 
@@ -1467,6 +1511,8 @@ A central data-lifecycle engine can coordinate policy, but the owning module rem
 
 Legal hold must be non-bypassable by ordinary purge jobs.
 
+Coverage — every data-owning module having declared these descriptors, and the declarations matching actual behaviour — is gate `VG-14`.
+
 ---
 
 ## 34. Open source and licensing governance
@@ -1481,6 +1527,8 @@ Every runtime/build dependency should be subject to:
 - replacement feasibility.
 
 Core architecture should prefer well-supported ecosystem components over niche crates when the feature can be implemented safely with standard Tokio/Tower/SQLx primitives.
+
+**[O] `OD-08`** — neither AWBMS's own licence nor its dependency licence allow-list has been decided. The first is a commercial and ownership question outside this document's scope but inside somebody's; the second is a prerequisite for `cargo-deny` and therefore for step 2 of [§51](#51-initial-implementation-sequence-after-definition-of-ready). Until AWBMS carries a licence, default copyright applies and no third party has any right to use it — which is a decision by default, not an absence of one.
 
 ---
 
@@ -1598,6 +1646,8 @@ Migration must be:
 
 No destructive transformation should be performed without a verified recovery point.
 
+All three modes assume the AWBMS team can obtain what migration engineering needs: read access to the AWCMS repository for `VG-01`, and production-like database snapshots to test against (`AS-03`). Neither has been confirmed available, and `VG-01` cannot be discharged without the first.
+
 ---
 
 ## 38. Migration ledger
@@ -1612,7 +1662,7 @@ AWBMS-native migrations should preserve strong migration properties already prov
 - explicit migration history table;
 - startup/deploy checks for schema version.
 
-Do not rely solely on a migration framework default if it weakens these guarantees.
+**[D]** These properties are binding (`AD-25`). Do not rely solely on a migration framework default if it weakens them — verify against gate `VG-10` instead, which checks applied-migration immutability by checksum rather than by convention.
 
 ---
 
@@ -1659,6 +1709,8 @@ Normalize only fields legitimately nondeterministic, for example:
 - cryptographic nonces.
 
 The harness must not hide semantic differences.
+
+**[D]** The parity harness is a first-class deliverable, not a testing convenience (`AD-26`). Its scope depends on `OD-03`, and the fixtures it runs against come from `VG-01`; it cannot be built before either.
 
 ---
 
@@ -1727,6 +1779,8 @@ Apply this to:
 - media jobs;
 - domain sync/integration workloads.
 
+The protocol assumes a single operational team controls both implementations during coexistence, so that ownership transfer can be made atomic by agreement rather than by mechanism (`AS-08`). If AWCMS and AWBMS were operated by separate teams, "never concurrently consume" would need enforcement in the queue itself, not in a runbook.
+
 ---
 
 ## 42. Rollback model
@@ -1743,7 +1797,7 @@ Minimum rollback preparation:
 - event/job ownership status;
 - post-rollback verification checklist.
 
-Rollback is not merely “redeploy old image” if database state or queue ownership has changed.
+**[D]** Rollback is defined and rehearsed before a wave deploys, never designed during an incident (`AD-28`). Rollback is not merely “redeploy old image” if database state or queue ownership has changed; the evidence that a rollback actually works is gate `VG-12`.
 
 ---
 
@@ -1770,6 +1824,8 @@ awbms-cli
 ```
 
 Images should use multi-stage builds and minimal runtime contents.
+
+This baseline assumes the Docker/Coolify/Traefik/Cloudflare stack is available to AWBMS and operable by whoever runs it (`AS-02`). **[O] `OD-05`** — how many deployments exist, and whether tenants are separated by deployment or only by tenant ID within one, is undecided. It determines what "tenant isolation" has to mean operationally as well as in SQL, so it blocks Blueprint sign-off.
 
 Runtime container principles:
 
@@ -1880,7 +1936,7 @@ Required test layers include:
 - indexes/constraints;
 - RLS;
 - role privileges;
-- concurrency locks.
+- concurrency locks (`VG-06` for the RLS and role-privilege evidence specifically).
 
 ### Authorization
 
@@ -2023,7 +2079,7 @@ Then continuous improvement loops findings back into the affected specifications
 A recommended execution order is:
 
 1. Bootstrap Cargo workspace and pinned toolchain.
-2. Establish formatting/lint/test/dependency-security CI.
+2. Establish formatting/lint/test/dependency-security CI (`VG-02`; requires `OD-02` and `OD-08` closed).
 3. Implement typed configuration and fail-fast validation.
 4. Implement error model/API envelope.
 5. Implement structured tracing/correlation.
@@ -2283,35 +2339,175 @@ The project is therefore **approved to proceed to Stage 1: AWBMS Master Blueprin
 
 ---
 
+> **How to read the registers.** Up to v0.1.0 these appendices described what the registers *should* contain rather than containing it — which is the drift pattern [§2.1](#21-documentation-drift-warning) argues against, applied by this document to itself. They are now tables. Every identifier used anywhere in this document resolves to exactly one row below, and `scripts/check-docs.sh` fails the build if it does not, or if a row here has outlived every reference to it (`VG-16`).
+>
+> **Owner fields read *unassigned* throughout.** That is accurate, not an oversight: no owner has accepted this validation ([Appendix F](#appendix-f--approval-record)). Assigning owners is the first Blueprint task.
+
 ## Appendix A — Recorded external claims
 
-This register records claims inherited from the original validation rather than verified in the current AWBMS repository. The claims currently identified are `C-01`–`C-07`, including the claims labelled in §2 and §4.1. Each claim remains unresolved until `VG-01` re-checks it against a pinned source commit and stores the resulting inventory under `contracts/legacy/awcms/`.
+Claims inherited from the original validation, observed against repositories **outside** this one and therefore not verifiable from it. Each is unresolved until `VG-01` re-checks it against a pinned source commit and stores the result under `contracts/legacy/awcms/`.
 
-**Required fields:** claim ID, source repository, source commit, observation, verification date, verifier, evidence path, and disposition (`confirmed`, `amended`, or `rejected`).
+Verification date, verifier and evidence digest are recorded in the inventory artifact itself, not duplicated here — the inventory is the evidence, and a second copy of its metadata would be one more thing to drift.
+
+| Claim | Source | Observation | Gate | Disposition |
+|---|---|---|---|---|
+| `C-01` | `ahliweb/awcms` v10.1.0 @ `11f2e95a47b1328a820f976d60f978c38a067903`, 2026-08-28; `ahliweb/awcms-astro` @ **no commit recorded** | The AWCMS state the original validation reviewed | `VG-01` | **Unverified.** The missing `awcms-astro` commit is itself a defect: the consumer contract surface in [§39](#39-awcms--awbms-parity-harness) depends on it |
+| `C-02` | AWCMS module registry source | AWCMS contains 24 registered modules, listed in [§2](#2-source-of-truth-review) | `VG-01` | **Unverified.** Reported from the registry rather than prose, so more likely to hold than `C-03`, but gated identically. An inventory, **not** an AWBMS v1 scope commitment — see `OD-09` |
+| `C-03` | AWCMS *architecture prose* | Migrations through `sql/148`; FORCE RLS on tenant-scoped tables; separated database roles; module composition rules; OpenAPI/AsyncAPI contracts; audit/event systems; SYSTEM administration surface | `VG-01` | **Unverified, and known to be the weakest claim here.** Sourced from prose that [§2.1](#21-documentation-drift-warning) states is known to lag implementation. `sql/148` is a documentation figure of unknown accuracy; `VG-01` MUST re-derive it from the migration directory and ledger table |
+| `C-04` | AWCMS CI configuration and gate scripts | AWCMS enforces machine-checked architectural gates, listed in [§2](#2-source-of-truth-review) | `VG-01` | **Unverified.** `VG-01` MUST record each listed gate as *enforced in CI*, *advisory*, or *absent* |
+| `C-05` | Original validation narrative | Those gates were created in response to production or review failures, and therefore encode invariants a feature list does not capture | `VG-01` | **Unverified, and strategically load-bearing.** `C-05` is why AWBMS treats AWCMS as a requirements source rather than a codebase to translate (`AD-01`). If the gates prove aspirational, the AWBMS gate set in [§28](#28-maintainability-and-code-quality-gates) must be re-derived from threat modelling instead of inheritance |
+| `C-06` | Original validation, dated 2026-08-20 | Rust stable `1.98.0` released; Tokio, Axum, SQLx, Tower, Reqwest, Serde, rustls and OpenTelemetry production-ready at that date | `VG-03` | **Unverified and time-decaying.** MUST NOT be carried into the Blueprint ([§49.1](#491-entry-conditions) condition 5). Resolve the real toolchain version at bootstrap and record it in `rust-toolchain.toml` |
+| `C-07` | AWCMS newsletter hardening, **no commit or date recorded** | Per-IP rate limits alone could not prevent repeated email delivery to a victim address; recipient-oriented cooldown semantics were required | `VG-01` | **Unverified.** `VG-01` MUST capture the actual rate-limit dimensions from the implementation rather than from [§32](#32-abuse-resistance) |
 
 ## Appendix B — Assumption register
 
-Assumptions are not facts and must not be carried into implementation silently. The current document contains assumptions about deployment topology, incumbent runtime behavior, migration access, workload shape, tenant boundaries, availability requirements, provider capabilities, and operational ownership. Before Blueprint sign-off, each assumption must receive an owner, a validation method, a target stage, and a disposition. If an assumption is falsified, its dependent decision must be revisited.
+Assumptions are relied upon but not established. Carrying one into implementation silently is how a design acquires a failure mode nobody chose. Each row states what breaks if the assumption is false — that column, not the assumption text, is the reason the register exists.
+
+| ID | Assumption | Relied on by | If falsified | Validation method | Owner |
+|---|---|---|---|---|---|
+| `AS-01` | AWCMS runs on a TypeScript/Bun runtime | [§41](#41-worker-cutover-safety) | Little. The cutover protocol depends only on there being exactly one owner at a time, not on which runtime | Observe the AWCMS deployment | *unassigned* |
+| `AS-02` | The Docker/Coolify/Traefik/Cloudflare stack is available to AWBMS and operable by whoever runs it | `AD-30`, [§43](#43-deployment-architecture) | `AD-30` is re-opened; container, routing and edge selections are re-made | Confirm with whoever operates the infrastructure | *unassigned* |
+| `AS-03` | The AWBMS team can obtain AWCMS repository read access and production-like database snapshots | [§2.2](#22-required-awcms-source-inventory-vg-01), [§37.3](#373-preferred-long-term-approach) | `VG-01` cannot be discharged, so [§49.1](#491-entry-conditions) condition 1 cannot be met and the Blueprint cannot be signed off | Request access; record the outcome | *unassigned* |
+| `AS-04` | AWBMS requests are dominated by database and authorization work, not framework routing | [§23](#23-performance-expectations), and the reasoning behind `AD-04` | `AD-04`'s rationale weakens materially — it explicitly discounts raw HTTP throughput on the strength of this assumption | Benchmark corpus, [§23.1](#231-required-benchmark-corpus) | *unassigned* |
+| `AS-05` | The tenant is the isolation unit; no sub-tenant partition or deliberate cross-tenant sharing is required | `AD-10`, [§11.2](#112-tenant-security) | The RLS policy model changes shape rather than merely extending; `VG-06` scope grows | Product requirements, Blueprint | *unassigned* |
+| `AS-06` | No availability requirement forces multi-region or active-active deployment in v1 | [§24](#24-horizontal-scalability), and indirectly `AD-05` | Reopens `AD-05`. A single authoritative primary is what most transactional guarantees here rest on | SLO definition, `OD-06` | *unassigned* |
+| `AS-07` | Providers offer the capabilities the ports assume — R2 presigning, a deliverable email path, a push transport, an OIDC provider where federation is required | `AD-17`, [§19](#19-object-storage) | Individual adapters are redesigned; the port abstraction itself survives, which is the point of having it | Provider documentation and a spike per adapter | *unassigned* |
+| `AS-08` | One operational team controls both implementations during coexistence, so ownership transfer can be atomic by agreement | `AD-27`, [§41](#41-worker-cutover-safety) | "Never concurrently consume" needs enforcement in the queue itself, not in a runbook | Organisational confirmation | *unassigned* |
 
 ## Appendix C — Decision register
 
-Decision identifiers such as `AD-01`, `AD-02`, `AD-04`, `AD-06`, `AD-07`, `AD-10`, `AD-11`, `AD-13`, `AD-14`, `AD-17`, `AD-18`, `AD-19`, `AD-20`, `AD-22`, `AD-24`, `AD-27`, and `AD-30` are the binding decision references used in this document. Their authoritative register entry must contain: status, decision text, rationale, alternatives considered, consequences, owner, date, superseded-by (if any), and verification gate. No decision is implementation-ready until those fields are completed in the Master Blueprint or a linked ADR.
+The authoritative decision list. `AD-01`–`AD-30` were made by the original validation; `AD-31` and `AD-32` were added in v0.2.0 and cover this repository's own governance.
+
+**Status is `Accepted` for every row.** No decision here has been superseded. A reversed decision is never edited in place — it receives a successor row, and the original's status becomes `Superseded by AD-nn`, so the reasoning history stays readable.
+
+**No decision below is implementation-ready.** Each needs alternatives, consequences, an owner and a date recorded in the Master Blueprint or a linked ADR before code depends on it. The `Gate` column names the evidence that would move it from *reasoned* to *validated*; none has been produced.
+
+| ID | Decision | Rationale and principal consequence | § | Gate |
+|---|---|---|---|---|
+| `AD-01` | AWBMS is a new Rust-native platform, not a source translation of AWCMS | AWCMS invariants are valuable; AWCMS code is not portable. Consequence: requirements must be extracted, which costs `VG-01` before migration work can begin | [§1](#1-executive-decision), [§2](#2-source-of-truth-review) | `VG-01` |
+| `AD-02` | Rust 2024 Edition on a pinned stable toolchain | Pinning makes builds reproducible and upgrades deliberate. Consequence: someone must own an upgrade cadence — `OD-02` | [§4.1](#41-recommended-baseline) | `VG-03` |
+| `AD-03` | Tokio as the async runtime | The ecosystem's centre of gravity; Axum, Tower, Hyper, SQLx and Reqwest all assume it. Consequence: blocking I/O on executor threads becomes a defect class needing its own lint | [§4.1](#41-recommended-baseline), [§7](#7-recommended-macro-architecture) | `VG-04` |
+| `AD-04` | Axum + Tower + Tower HTTP as the HTTP foundation | Shared Tower/Hyper/Tokio service ecosystem for tracing, timeouts, concurrency limits, load shedding and future gRPC. Not chosen on throughput — Actix was not disqualified. Consequence: the choice rests on architectural fit and `AS-04`, neither measured | [§5](#5-http-framework-decision-axum) | `VG-04` |
+| `AD-05` | PostgreSQL is the authoritative system of record | Changing runtime language does not justify changing the database. Consequence: RLS, advisory locks, outbox and job queues all rest on one primary — see `AS-06` | [§11](#11-postgresql-architecture) | `VG-06` |
+| `AD-06` | SQLx as the primary PostgreSQL access layer | AWBMS depends on database behaviour that is part of the security architecture and must stay visible: RLS, `SET LOCAL`, advisory locks, CTEs, `SKIP LOCKED`. Consequence: no ORM convenience; more hand-written SQL to review | [§6](#6-database-access-decision-sqlx) | `VG-04` |
+| `AD-07` | Modular monolith, microservice-extractable | The real bottlenecks — query design, lock contention, connection capacity, authorization complexity — are not solved by network boundaries. Consequence: module seams must be maintained by gates, since nothing physical enforces them | [§8](#8-modular-monolith-decision) | `VG-02` |
+| `AD-08` | Explicit module registry, reviewed at compile time | Runtime plugin discovery makes the module set a deployment-time property, which defeats every gate: a DAG known only at startup cannot be checked in CI. Consequence: adding a module is a code change, by design | [§10](#10-module-composition-model) | `VG-02` |
+| `AD-09` | One mutable table has exactly one authoritative module owner | Shared write access is how module boundaries quietly stop existing. Consequence: cross-domain writes need ports, capabilities, read models or events — more indirection, deliberately | [§10.1](#101-one-table-one-writer-principle) | `VG-02` |
+| `AD-10` | RBAC + ABAC + Separation of Duties + PostgreSQL FORCE RLS | Defence in depth: application authorization, explicit tenant predicate, and RLS as backstop. Consequence: three layers to keep consistent; RLS is never an excuse to omit the predicate | [§11.2](#112-tenant-security), [§13](#13-authorization-architecture) | `VG-06`, `VG-07` |
+| `AD-11` | Opaque, revocable server-side sessions for human users | Logout, admin revocation, password reset, MFA step-up and membership changes must take effect immediately, which self-contained JWTs cannot do. Consequence: a session lookup per request. JWT stays appropriate for OIDC | [§12](#12-authentication-architecture) | `VG-05` |
+| `AD-12` | Argon2id for new password storage, with opportunistic rehash on login during migration | Migrates users without forcing a mass password reset. Consequence: the legacy verifier lives in the compatibility adapter until `OD-03` closes and the window ends | [§12.1](#121-password-hashing) | `VG-05` |
+| `AD-13` | Transactional PostgreSQL outbox as the default domain-event mechanism | Atomicity between business state and event publication without distributed transactions. Consequence: a broker may later be an adapter behind the outbox, never a replacement. Kafka/NATS/RabbitMQ are not v1 dependencies | [§15](#15-transactional-events) | `VG-11` |
+| `AD-14` | PostgreSQL-backed job queues with horizontally scalable Rust workers | Built on `FOR UPDATE SKIP LOCKED` and explicit AWBMS contracts rather than a third-party scheduler abstraction. Consequence: AWBMS owns claim, lease, retry and dead-letter semantics — more code, fully inspectable | [§16](#16-job-architecture) | `VG-11` |
+| `AD-15` | No external provider I/O inside a business database transaction | Shorter locks, less connection starvation, safe retries, provider-outage isolation. Consequence: user-visible effects become asynchronous, so the UX must account for eventual completion | [§17](#17-external-io-rule) | `VG-05` |
+| `AD-16` | Reqwest with rustls and explicit feature configuration | Never depend on whichever TLS backend transitive features happen to select. Consequence: outbound calls must declare timeouts, body limits, redirect and retry policy, and SSRF restrictions | [§18](#18-outbound-httptls) | `VG-13` |
+| `AD-17` | Cloudflare R2 behind an AWBMS storage port | Domain logic depends on the port, not the provider. Consequence: filesystem and in-memory adapters become available for local and test use, which is most of the benefit | [§19](#19-object-storage) | `VG-05` |
+| `AD-18` | Redis/Valkey optional, never an initial correctness dependency | AWBMS must remain correct after full cache eviction. Consequence: permissions, membership, session state, workflow truth, audit and financial state may never live only in cache | [§20](#20-cache-architecture) | `VG-05` |
+| `AD-19` | OpenAPI and AsyncAPI contract-first | Reviewed contract files, not Rust derive macros, are the source of API truth during migration. Consequence: contracts and implementation must be kept in step by a gate rather than by generation | [§21](#21-api-contracts) | `VG-08` |
+| `AD-20` | `tracing` + OpenTelemetry/OTLP | Correlation across request, job and event boundaries. Consequence: a redaction discipline is mandatory — tokens, MFA secrets, recovery codes and unnecessary PII must never be logged | [§22](#22-observability) | `VG-02` |
+| `AD-21` | A stable `ApiError` envelope and client-facing error taxonomy, defined before module implementation | Error shape is a published contract under `AD-19` whether or not anyone intended it. Consequence: defining it late means retrofitting every handler already written | [§29](#29-error-model) | `VG-08` |
+| `AD-22` | Pinned dependencies with supply-chain gates | `Cargo.lock` committed; `cargo audit`, `deny`, `vet`, licence allow-list, SBOM, container scan. Consequence: dependency updates become reviewed events, and `OD-08` must close before `cargo-deny` can run | [§27](#27-supply-chain-security) | `VG-13` |
+| `AD-23` | Idempotency as a reusable platform capability | High-risk and retry-prone mutations must resolve to one committed business effect. Consequence: key scope, principal binding, request fingerprint, in-flight conflict and replay semantics are platform concerns, not per-module ones | [§31](#31-idempotency) | `VG-11` |
+| `AD-24` | AWCMS compatibility layer and parity suite, with no source or runtime dependency on the AWCMS repository | Compatibility must be reproducible without making AWCMS a build dependency. Consequence: legacy artifacts enter only as provenance-stamped frozen fixtures | [§3](#3-repository-independence), [§36](#36-awcms-compatibility-architecture) | `VG-15` |
+| `AD-25` | Migration ledger with ordering, applied-migration immutability, SHA-256 checksums and a cross-process lock | A framework default that weakens these guarantees is not acceptable. Consequence: AWBMS may need to own the migration runner rather than adopt one wholesale | [§38](#38-migration-ledger) | `VG-10` |
+| `AD-26` | A first-class AWCMS↔AWBMS parity harness | "Obviously the same behaviour" is exactly the claim the harness exists to check. Consequence: it cannot be built before `VG-01` supplies fixtures and `OD-03` fixes its scope | [§39](#39-awcms--awbms-parity-harness) | `VG-05` |
+| `AD-27` | Strangler migration; exactly one implementation owns production writes for a capability at a time | Avoids a single massive replacement, and avoids double-writes. Consequence: coexistence on a shared schema forces expand-contract on every migration — see `OD-01` | [§40](#40-coexistence-and-cutover) | `VG-05` |
+| `AD-28` | Rollback defined and rehearsed before each production wave deploys | Rollback is not "redeploy the old image" once database state or queue ownership has changed. Consequence: a wave without a verified recovery point is not deployable | [§42](#42-rollback-model) | `VG-12` |
+| `AD-29` | `#![forbid(unsafe_code)]` in AhliWeb-owned crates where practical | Removes an entire vulnerability class from first-party code by default. Consequence: any exception needs an ADR, isolation, security review, dedicated tests and fuzzing | [§26.1](#261-unsafe-code-policy) | `VG-13` |
+| `AD-30` | Docker + Coolify + Traefik + Cloudflare for deployment and edge | Matches existing operational capability — see `AS-02`. Consequence: multi-stage builds, non-root runtime, no toolchain in the final image, runtime-injected secrets | [§43](#43-deployment-architecture) | `VG-02` |
+| `AD-31` | The specification is versioned `vX.Y.Z` with the repository, using changesets | One version number, mechanically checked across `VERSION`, `CHANGELOG.md` and this document's header. Consequence: the standalone `Document version` field is retired; every change carries a changeset | [§0.5](#05-document-control) | `VG-16` |
+| `AD-32` | Structural document invariants are enforced by an executable gate, not by review attention | v0.1.0 shipped dangling identifiers, a wrong fact count and a stale commit claim, in a document written to be rigorous. Consequence: the gate is binding about form and silent about content — reviewers keep the judgement work | [§0.5](#05-document-control) | `VG-16` |
 
 ## Appendix D — Open decision register
 
-The currently explicit open decisions are `OD-01` (migration mode), `OD-02` (dependency/toolchain upgrade policy), `OD-04` (performance acceptance thresholds), and `OD-09` (AWBMS v1 module scope). The Blueprint must add any missing open decisions discovered during source inventory and assign each one an owner, deadline, decision criteria, and blocking stage. An open decision must not be silently resolved in implementation code.
+An open decision must not be resolved silently in prose or in implementation code. Closing one means recording a decision with its rationale, as a new `AD-` row or an ADR.
+
+Six of the nine block Blueprint sign-off ([§49.1](#491-entry-conditions) condition 2). The other three block later stages and are listed here so they are not rediscovered as surprises.
+
+| ID | Question | Why it is open | Decision criteria | Blocks | Owner |
+|---|---|---|---|---|---|
+| `OD-01` | Which migration mode: takeover of the AWCMS production database, a new AWBMS-native deployment, or deterministic migration into a native schema? | The three modes are not interchangeable. Takeover forces schema-name compatibility and expand-contract on every migration; a new deployment forgoes coexistence entirely; native migration needs a reconciliation pipeline neither other mode requires | Per deployment, weighing coexistence duration, downtime tolerance and reconciliation cost. `AD-27` is the successor decision to record | **Blueprint sign-off.** Do not begin migration engineering while all three remain open | *unassigned* |
+| `OD-02` | What is the dependency and toolchain upgrade policy? | "Supported/LTS line where practical" names no cadence, no owner and no upgrade trigger, so it is not actionable | Must define pin granularity, routine upgrade cadence, and an expedited path for a RustSec advisory | CI establishment, [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 2 | *unassigned* |
+| `OD-03` | Which AWCMS credential formats, session shapes and legacy contracts must AWBMS accept? | Cannot be answered from this document; it depends on what `VG-01` finds in the implementation | Scope chosen against migration risk and the cost of carrying compatibility surface | **Blueprint sign-off.** Determines `AD-26` harness scope and [§36](#36-awcms-compatibility-architecture) surface | *unassigned* |
+| `OD-04` | What are the acceptance thresholds for each benchmark scenario? | No threshold is defined for any metric, so "benchmark improves a defined metric" ([§48](#48-performance-validation-gates)) is unenforceable | Per scenario: an explicit SLO, or a "baseline-only, no regression beyond X%" rule. Depends on `OD-06` | **Blueprint sign-off.** Until closed, `VG-09` verifies only that measurements were taken, not that they were acceptable | *unassigned* |
+| `OD-05` | How many deployments exist, and are tenants separated by deployment or only by tenant ID within one? | Determines what tenant isolation means operationally as well as in SQL | Product and commercial requirements, weighed against operational cost per deployment | **Blueprint sign-off** | *unassigned* |
+| `OD-06` | What are the SLO targets per capability? | [§49.2](#492-blueprint-contents) lists SLOs as Blueprint content; none exists. `OD-04` cannot set thresholds without them | Availability, latency and durability targets per capability class | **Blueprint sign-off** | *unassigned* |
+| `OD-07` | Does search stay in PostgreSQL (`tsvector`/GIN/`pg_trgm`) or move to a dedicated index? | Changes whether search is a microservice extraction candidate at all ([§8.2](#82-microservice-extraction-rule)), and changes the data lifecycle surface | Corpus size, query shape and relevance requirements, measured | First module implementation requiring search, [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 24 | *unassigned* |
+| `OD-08` | What licence does AWBMS carry, and what dependency licence allow-list applies? | Neither is decided. Until AWBMS carries a licence, default copyright applies and no third party has any right to use it — a decision by default | Commercial and ownership decision for the first; policy derived from it for the second | CI establishment, [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 2 — `cargo-deny` needs the allow-list | *unassigned* |
+| `OD-09` | What is the AWBMS v1 module scope? | The 24 AWCMS modules of `C-02` are an inventory, not a commitment. Treating them as scope would make v1 a full reimplementation by default | Product priority against migration risk, module by module | **Blueprint sign-off** | *unassigned* |
 
 ## Appendix E — Verification gate register
 
-The gates currently referenced are `VG-01` (AWCMS source inventory), `VG-03` (toolchain resolution), `VG-04` (ecosystem and sensitive-stack validation), `VG-05` (correctness/security parity), `VG-09` (performance validation), `VG-12` (recovery/rollback evidence), and `VG-15` (repository independence). Each gate must define its evidence artifact, executable check where applicable, pass/fail rule, owner, and last verified commit or date. A gate reference without evidence is not a passed gate.
+A gate defines the evidence that would move a claim or decision from *reasoned* to *established*. **A gate reference is not a passed gate.**
+
+**Every gate below is open. Zero have been discharged.** `VG-16` is the only one with a working executable check, and it verifies this document's structure, not its truth.
+
+| ID | Gate | Evidence artifact | Executable check | Pass rule | Status |
+|---|---|---|---|---|---|
+| `VG-01` | AWCMS source inventory | `contracts/legacy/awcms/` — module registry, migration list with per-file SHA-256, RLS/FORCE RLS table list, roles and grants, route inventory, OpenAPI/AsyncAPI documents, gate list marked enforced/advisory/absent, authorization vectors, rate-limit dimensions, credential formats | Re-runnable generator committed to this repository, recording the AWCMS commit SHA | Every item in [§2.2](#22-required-awcms-source-inventory-vg-01) present and machine-derived, not prose | **Open.** Blocked on `AS-03` |
+| `VG-02` | Repository bootstrap and CI green | Cargo workspace, `rust-toolchain.toml`, CI configuration | The [§28](#28-maintainability-and-code-quality-gates) command set, plus module DAG, route, table and job ownership checks | All gates green on a commit | **Open.** No workspace exists |
+| `VG-03` | Toolchain resolution and pin | `rust-toolchain.toml`, `Cargo.lock` | `cargo --version` in CI against the pin | Toolchain resolved at bootstrap and pinned; `C-06` retired rather than carried forward | **Open** |
+| `VG-04` | Ecosystem and sensitive-stack validation | A prototype exercising Axum/Tower, SQLx with RLS and `SKIP LOCKED`, and the transactional outbox | Prototype integration tests | The two flagged `AD-06` matrix rows re-checked against current upstream documentation, and `AD-04`/`AD-06` confirmed or revised on evidence | **Open.** `AD-04` and `AD-06` currently rest on reasoning alone |
+| `VG-05` | Correctness and security parity | Parity harness output over the AWCMS request corpus | `tests/parity/` | No unexplained semantic difference; normalisation limited to legitimately nondeterministic fields | **Open.** Blocked on `VG-01` and `OD-03` |
+| `VG-06` | Tenant isolation and RLS evidence | RLS test results, `pg_class`/`pg_policy` introspection, role privilege assertions | `tests/rls/` | Cross-tenant access denied at all three layers ([§11.2](#112-tenant-security)); `awbms_app` confirmed `NOBYPASSRLS` and non-owner | **Open** |
+| `VG-07` | Authorization chokepoint coverage | Route-to-authorization mapping; decision log samples | Static check that every protected route passes the chokepoint | No protected operation bypasses it; no undocumented exception | **Open** |
+| `VG-08` | Contract conformance | OpenAPI and AsyncAPI documents plus the implemented route table | `tests/contract/` | Every implemented route specified and every specified route implemented or explicitly planned; unique `operationId`; error envelope consistent | **Open** |
+| `VG-09` | Performance validation | Benchmark results over the [§23.1](#231-required-benchmark-corpus) corpus | Benchmark harness | Measurements taken on identical infrastructure, dataset and workload. **Acceptability is not assessed until `OD-04` closes** | **Open.** No benchmark designed or run |
+| `VG-10` | Migration ledger integrity | Migration history table and per-file checksums | Migration runner startup check | Applied migration contents immutable by checksum; cross-process lock demonstrated | **Open** |
+| `VG-11` | Idempotency and concurrency evidence | Duplicate-request, parallel-update, job-claim and event-dispatch test results | `tests/concurrency/` | One committed business effect per idempotency key; no double-processing of jobs or events | **Open** |
+| `VG-12` | Recovery and rollback evidence | Rehearsal record per migration wave | Restore test against a production-like snapshot | Recovery point verified and rollback executed successfully **before** the wave deploys | **Open** |
+| `VG-13` | Supply-chain evidence | `cargo audit`, `deny`, `vet` output; SBOM; container scan; licence report | [§28](#28-maintainability-and-code-quality-gates) command set | All clean or with recorded, reviewed exceptions. Blocked on `OD-08` for the licence allow-list | **Open** |
+| `VG-14` | Data lifecycle and privacy coverage | Per-module lifecycle and subject-data descriptors | Coverage check over data-owning modules | Every data-owning module declares descriptors, and declarations match behaviour; legal hold demonstrably non-bypassable | **Open** |
+| `VG-15` | Repository independence | Absence of `.gitmodules`; absence of AWCMS path or git dependencies in any Cargo manifest; no vendored AWCMS source | `scripts/check-docs.sh` | No coupling of any prohibited form in [§3.2](#32-prohibited-couplings) | **Currently satisfied and continuously checked.** Not *discharged* — it is a standing condition, not a one-off proof |
+| `VG-16` | Documentation and version integrity | This document, `VERSION`, `CHANGELOG.md`, `.changeset/` | `scripts/check-docs.sh` | Version consistent across all three locations; every identifier resolves to exactly one register row; no orphaned rows; every internal anchor resolves; changesets well-formed | **Currently passing.** Verifies structure only — it cannot tell whether any claim here is true |
 
 ## Appendix F — Approval record
 
-**Status:** conditionally approved to begin Stage 1 — Master Blueprint. **Approver:** unassigned. **Approval date:** unassigned. **Conditions:** the entry conditions in §49.1 must be discharged before Blueprint sign-off. This section is intentionally incomplete until an owner records a real approval decision; it is not evidence of approval by itself.
+| Field | Value |
+|---|---|
+| Status | Conditionally approved to **begin** Stage 1 — Master Blueprint |
+| Approver | **unassigned** |
+| Approval date | **unassigned** |
+| Scope of approval | Beginning Blueprint authoring. **Not** approval to begin migration engineering or implementation |
+
+**This record is deliberately incomplete, and its incompleteness is the point.** No human has accepted this validation. The status line above describes the document's intended disposition, not an approval that occurred — and this section is not evidence of one.
+
+Stage 1 may begin immediately; Blueprint authoring is itself the work that closes most open decisions. Stage 1 may not **complete** until the six conditions in [§49.1](#491-entry-conditions) are discharged.
+
+| Condition | State |
+|---|---|
+| 1 — `VG-01` discharged, superseding `C-01`–`C-05` and `C-07` | Not started; blocked on `AS-03` |
+| 2 — every Blueprint-blocking open decision closed | 0 of 6 closed |
+| 3 — every assumption confirmed or its dependent decision revisited | 0 of 8 confirmed |
+| 4 — `VG-03` and `VG-04` discharged | Not started |
+| 5 — `C-06` removed rather than carried forward | Pending Blueprint authoring |
+| 6 — AWBMS v1 module scope defined (`OD-09`) | Open |
+
+If condition 1 falsifies a material claim — for example if the `C-04`/`C-05` gates prove advisory rather than enforced — this validation MUST be revised before the Blueprint proceeds, not patched inside it.
 
 ## Appendix G — AWCMS invariant traceability
 
-The required traceability chain is: AWCMS invariant → source evidence → AWBMS control/decision → automated test or operational check → owner. At minimum, the matrix must cover tenant isolation, authorization chokepoints, route/table/job ownership, migration immutability, auditability, data lifecycle, contract compatibility, and generated-artifact drift. The matrix is a Blueprint deliverable and must not be replaced by a prose assertion of parity.
+The chain each row must complete: **AWCMS invariant → source evidence → AWBMS control → automated check → owner.**
+
+The matrix below establishes the required coverage and the AWBMS side of each chain. **The source-evidence column cannot be completed from this repository** — every entry depends on `VG-01`, which is why the column reads *pending* throughout rather than citing `C-03`, whose own accuracy is unestablished.
+
+Completing this matrix is a Blueprint deliverable. It must not be replaced by a prose assertion that parity was achieved.
+
+| AWCMS invariant | Source evidence | AWBMS control | Automated check | Owner |
+|---|---|---|---|---|
+| Tenant isolation via FORCE RLS on tenant-scoped tables | Pending `VG-01` (`pg_class`/`pg_policy` introspection) | `AD-10` — application authorization + explicit tenant predicate + FORCE RLS | `VG-06` | *unassigned* |
+| Separated database roles; the application role cannot bypass RLS | Pending `VG-01` (`information_schema`) | [§11.1](#111-database-roles) — `awbms_app` is `NOSUPERUSER`, `NOBYPASSRLS`, non-owner, no DDL | `VG-06` | *unassigned* |
+| Authorization passes a single chokepoint; default deny; deny overrides allow | Pending `VG-01` (authorization tests) | `AD-10`, [§13](#13-authorization-architecture) | `VG-07` | *unassigned* |
+| Route ownership without collision | Pending `VG-01` (route inventory) | `AD-08` — explicit compile-time registry | `VG-02` | *unassigned* |
+| One module owns each mutable table | Pending `VG-01` (gate scripts) | `AD-09` | `VG-02` | *unassigned* |
+| Job ownership and environment allow-lists | Pending `VG-01` (gate scripts) | `AD-14`, [§16](#16-job-architecture) | `VG-02`, `VG-11` | *unassigned* |
+| Module DAG integrity | Pending `VG-01` (registry source) | `AD-08`, [§10](#10-module-composition-model) | `VG-02` | *unassigned* |
+| Migration immutability with checksum verification | Pending `VG-01` (migration ledger) | `AD-25` | `VG-10` | *unassigned* |
+| Auditability of security-significant actions | Pending `VG-01` (audit implementation) | [§14](#14-audit-architecture) — actor, tenant, action, decision, correlation, reason code | `VG-07` | *unassigned* |
+| Data lifecycle and subject-data coverage | Pending `VG-01` (lifecycle descriptors) | [§33](#33-data-lifecycle-and-privacy) — per-module declarations, non-bypassable legal hold | `VG-14` | *unassigned* |
+| OpenAPI contract and consumer coverage | Pending `VG-01` (contract files) | `AD-19`, `AD-21` | `VG-08` | *unassigned* |
+| Generated-artifact and documentation drift detection | Pending `VG-01` (CI configuration) | `AD-32` for this repository's own documents | `VG-16` | *unassigned* |
+| Recipient-oriented abuse controls, not per-IP alone | Pending `VG-01` (rate-limit dimensions, per `C-07`) | [§32](#32-abuse-resistance) — resource-dimensioned limits | `VG-05` | *unassigned* |
+| Idempotent high-risk mutations | Pending `VG-01` (idempotency implementation) | `AD-23` | `VG-11` | *unassigned* |
 
 ---
 

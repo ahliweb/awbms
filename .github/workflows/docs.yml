@@ -1,0 +1,79 @@
+name: docs
+
+# The executable documentation gate (ADR-0003). The architecture validation
+# requires (§2.1) that executable checks outrank prose; this workflow is that
+# rule applied to the repository's own documents.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-docs:
+    name: Documentation gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the changeset check below needs a merge base.
+          fetch-depth: 0
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run the documentation gate
+        run: scripts/check-docs.sh
+
+  changeset-present:
+    name: Changeset present
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a changeset for documentation and script changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin "$BASE_REF"
+          changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
+
+          printf 'Changed files:\n%s\n\n' "$changed"
+
+          # A release commit rewrites VERSION and consumes changesets; exempt.
+          if printf '%s\n' "$changed" | grep -qx 'VERSION'; then
+            echo "VERSION changed — treating as a release commit, exempt."
+            exit 0
+          fi
+
+          # Which paths oblige a changeset?
+          if ! printf '%s\n' "$changed" \
+               | grep -qE '^(docs/|scripts/|\.claude/|README\.md|CONTRIBUTING\.md)'; then
+            echo "No changeset required for these paths."
+            exit 0
+          fi
+
+          # A real changeset is any added .changeset/*.md that is not the
+          # directory's two permanent residents.
+          added="$(printf '%s\n' "$changed" \
+                   | grep -E '^\.changeset/[^/]+\.md$' \
+                   | grep -vx '\.changeset/README\.md' || true)"
+
+          if [ -n "$added" ]; then
+            printf 'Changeset present:\n%s\n' "$added"
+            exit 0
+          fi
+
+          echo "::error::This pull request changes documentation or scripts but adds no changeset."
+          echo "Run: scripts/changeset-new.sh --bump patch --type fixed --component <component> --summary '...'"
+          echo "See docs/versioning/CHANGESETS.md for when a changeset is required."
+          exit 1

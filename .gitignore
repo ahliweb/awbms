@@ -1,0 +1,17 @@
+# Rust build output (no Cargo workspace exists yet — see docs/architecture/§0.1)
+/target/
+**/*.rs.bk
+
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Local tooling scratch
+/.scratch/
+*.tmp
+*.log
+
+# OS noise
+.DS_Store
+Thumbs.db
