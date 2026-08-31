@@ -1,0 +1,13 @@
+a6e678ef3c3e1d5c0df01b768da36e46fb0d36a41c44bf0d3b9fec01241ee345  ./astro-consumer.json
+a75140479503dcecbc3ee5cd08670b720ede889efe0f17188a90070cd3c7fc9e  ./manifest.json
+1af7945eaea8e8b578eb25f4a2111da89052476b071f40765955662c49fba442  ./migrations.json
+a17bf87b9f44e0f941ea286b3bd29359a3d62e43b5d38f620f8a5d4bc9ed73f9  ./modules.json
+b191cb19c1a86e4889c4011eadc36c92788487f0e2b3cb688aeae822ca6ad0f1  ./source/awcms-api-consumer-contract.ts
+fd6455396b7fb04a32f29faa36fa38f86d2049321ebc0bf2178ca01706c04f4e  ./source/awcms-astro-contract.test.mjs
+178fb18df1385024e8553a01a92e3e5fac574d967aa273aaa19def25cfb0711e  ./source/awcms-astro-package.json
+6f4879354313daecf919324de1bf132a3a5faa20f0cdb0378cc53ed3c77f6e2b  ./source/awcms-ci.yml
+b661cbe711a38eb17c2db555c00a897779dbd96d1c36c2336604baed8548275a  ./source/awcms-domain-events.asyncapi.yaml
+6ace450a85e0181bedc661feae945c84dc333cf3144c1d8d22b6f8e8a1270ef6  ./source/awcms-module-registry.ts
+2c356b511640787e3643c0d012994d3ec202ba41f1af19417723d466fba8c365  ./source/awcms-package.json
+d72f3eb7298168274a9b8f037d905aa6261381751be7e9079935d7a5615676cf  ./source/awcms-public-api.openapi.yaml
+7e107aa455ea768eb101197cdb72d46d755de22f856e6537c9e030cbf5a64bd5  ./source/awcms-repo-inventory.md

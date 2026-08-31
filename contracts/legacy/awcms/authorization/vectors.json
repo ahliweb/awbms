@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "gate": "VG-01",
+  "sources": {
+    "awcms": "11f2e95a47b1328a820f976d60f978c38a067903",
+    "awcmsAstro": "7b753be619244541b817d5d8e7d3b72cfe88d4f9"
+  },
+  "vectors": [
+    {
+      "id": "ASTRO-TENANT-001",
+      "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
+      "class": "machine-credential-tenant-binding",
+      "input": "valid machine credential with no asserted tenant",
+      "expected": "tenant is derived from the machine credential and asserted=false"
+    },
+    {
+      "id": "ASTRO-TENANT-002",
+      "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
+      "class": "machine-credential-tenant-binding",
+      "input": "valid machine credential plus matching AWCMS_TENANT_ID, case-insensitive UUID",
+      "expected": "tenant matches credential and asserted=true"
+    },
+    {
+      "id": "ASTRO-TENANT-003",
+      "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
+      "class": "fail-closed-tenant-mismatch",
+      "input": "valid machine credential plus different AWCMS_TENANT_ID",
+      "expected": "fail closed with tenant-mismatch error before build can consume another tenant"
+    },
+    {
+      "id": "ASTRO-TENANT-004",
+      "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
+      "class": "credential-validation",
+      "input": "missing token, human/session bearer, or malformed machine credential",
+      "expected": "reject each invalid credential class; no fallback tenant"
+    },
+    {
+      "id": "ASTRO-TENANT-005",
+      "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
+      "class": "retired-configuration-rejection",
+      "input": "AWCMS_TENANT_CODE or AWCMS_DEFAULT_TENANT_CODE is supplied",
+      "expected": "reject retired tenant selectors rather than silently ignoring or trusting them"
+    },
+    {
+      "id": "NEWSLETTER-PUBLIC-001",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "anti-enumeration",
+      "input": "subscribe, confirm, or unsubscribe outcome varies internally",
+      "expected": "public success body remains the single neutral message and does not disclose subscriber state"
+    },
+    {
+      "id": "NEWSLETTER-PUBLIC-002",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "tenant-resolution",
+      "input": "anonymous newsletter request",
+      "expected": "tenant derives from verified request host/origin; caller-selected x-tenant-id or auth input cannot choose tenant"
+    },
+    {
+      "id": "NEWSLETTER-PUBLIC-003",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "abuse-resistance",
+      "input": "public newsletter endpoint request",
+      "expected": "shared rate limit is active and threshold is parsed with fail-safe positive-integer handling"
+    },
+    {
+      "id": "NEWSLETTER-PUBLIC-004",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "browser-cross-origin-contract",
+      "input": "cross-origin JSON POST preflight",
+      "expected": "subscribe, confirm, and unsubscribe expose the required OPTIONS/preflight response"
+    },
+    {
+      "id": "NEWSLETTER-CONSENT-001",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "privacy-consent",
+      "input": "subscription submitted but confirmation not completed",
+      "expected": "consent_at is not recorded; consent is written only when confirmation actually gives consent"
+    },
+    {
+      "id": "NEWSLETTER-TOKEN-001",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "bearer-secret-protection",
+      "input": "confirmation/unsubscribe bearer token",
+      "expected": "token is shape/length checked, hashed for storage, omitted from normal selects and admin display, and compared safely"
+    },
+    {
+      "id": "NEWSLETTER-UNSUBSCRIBE-001",
+      "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
+      "class": "data-subject-exit",
+      "input": "unsubscribe request",
+      "expected": "valid unsubscribe token is sufficient; email/session authentication is not additionally required"
+    },
+    {
+      "id": "DB-RLS-001",
+      "source": "controlled PostgreSQL introspection from pinned AWCMS migrations",
+      "class": "tenant-isolation-defense-in-depth",
+      "input": "pinned AWCMS schema after 148 migrations",
+      "expected": "134 tables have RLS enabled and FORCE RLS enabled"
+    },
+    {
+      "id": "DB-ROLE-001",
+      "source": "controlled PostgreSQL introspection from pinned AWCMS migrations",
+      "class": "least-privilege-database-roles",
+      "input": "schema owner, awcms_app, and awcms_worker after migration bootstrap",
+      "expected": "no listed role is SUPERUSER or BYPASSRLS; app/worker own zero business tables"
+    }
+  ]
+}

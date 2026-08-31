@@ -1,0 +1,5 @@
+grantee,routine_name,privilege_type,is_grantable
+awcms_app,awcms_list_partner_managed_tenants,EXECUTE,NO
+awcms_app,awcms_partner_registry_status,EXECUTE,NO
+awcms_app,awcms_resolve_tenant_domain_lookup,EXECUTE,NO
+awcms_worker,awcms_expire_delegated_access_grants,EXECUTE,NO
