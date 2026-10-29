@@ -46,6 +46,7 @@ project's own argument against maintaining the same statement in two places.
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-semantic-versioning-and-changesets.md) | Semantic versioning with `vX.Y.Z` and changesets | Accepted |
 | [0003](0003-executable-documentation-gate.md) | Documentation correctness is an executable gate | Accepted |
+| [0004](0004-adopt-product-development-flow-v2.md) | Adopt product development flow v2.0.0 | Accepted |
 
 ## Writing one
 
