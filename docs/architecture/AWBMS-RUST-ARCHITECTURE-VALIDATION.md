@@ -2060,16 +2060,19 @@ The Blueprint must formalize:
 AWBMS is a new platform and must follow the complete lifecycle:
 
 1. Master Blueprint
-2. PRD
+2. User Research + PRD
 3. Initial Threat Model + Privacy Analysis
-4. ERD + Data Dictionary
-5. RBAC + ABAC + RLS Matrix
-6. Domain / Verification Algorithm Specification
-7. OpenAPI + AsyncAPI
-8. UX/UI
+4. UX/UI Visualisation + Validated Prototype
+5. ERD + Data Dictionary
+6. RBAC + ABAC + RLS Matrix
+7. Domain / Verification Algorithm Specification
+8. OpenAPI + AsyncAPI + mock generated from the contract
 9. Cross-Spec Review / Definition of Ready
 10. Atomic GitHub Issues
-11. Implementation + Automated Tests
+11. Implementation + Automated Tests, per vertical slice:
+    - 11.1 Frontend, built against the mock generated from the contract
+    - 11.2 Backend, fulfilling the same contract
+    - 11.3 Integration (contract tests + E2E)
 12. PR + Review + CI
 13. Deploy Staging
 14. Internal Human Testing / UAT
@@ -2078,6 +2081,12 @@ AWBMS is a new platform and must follow the complete lifecycle:
 17. Production Validation
 18. Monitoring + Post-Release Review
 
+> **Lifecycle revised by ([`ADR-0004`](../adr/0004-adopt-product-development-flow-v2.md)).** Before that ADR this list placed UX/UI at step 8, after the data model and the contract, and treated step 11 as one undivided step. It now follows product development flow v2.0.0: UX/UI is a validated prototype at **step 4**, before the ERD, so old steps 4–7 are now 5–8 and old step 8 is now 4. Steps 1, 3, 9, 10 and 12–18 keep their numbers; step 2 gains user research as a mandatory input. Any citation of "§50 step N" written before ADR-0004 uses the old numbering — translate with the table in ADR-0004.
+>
+> **Authorisation is never frontend-only.** Whatever 11.1 builds, permissions are enforced in the backend and in PostgreSQL (RBAC/ABAC/RLS, `AD-` register); the frontend only reflects them. **Definition of Ready (step 9) additionally fails on a screen with no data source in the contract.**
+>
+> AWBMS has no frontend today. Until one exists, 11.1 means that the frontend consumer — whichever repository it lives in, for example `ahliweb/awcms-astro` for the AWCMS compatibility wave — builds against the contract mock, not against a running AWBMS. This document does not specify frontend components.
+
 Then continuous improvement loops findings back into the affected specifications, tests and controls.
 
 ---
@@ -2085,6 +2094,8 @@ Then continuous improvement loops findings back into the affected specifications
 ## 51. Initial implementation sequence after Definition of Ready
 
 A recommended execution order is:
+
+> Items 1–23 are platform-kernel work that precedes any user-facing slice. They belong to lifecycle step 11 and, because they have no screen, they are 11.2 (backend) work. From item 24 on, every module is delivered **per slice as 11.1 frontend (against the contract mock) → 11.2 backend → 11.3 integration**, as set out in [§52](#52-vertical-module-implementation). Item numbers below are unchanged, because other documents cite them (`OD-02`, `OD-07`, `OD-08`).
 
 1. Bootstrap Cargo workspace and pinned toolchain.
 2. Establish formatting/lint/test/dependency-security CI (`VG-02`; requires `OD-02` and `OD-08` closed).
@@ -2109,7 +2120,7 @@ A recommended execution order is:
 21. Implement PostgreSQL job worker.
 22. Implement object-storage and integration ports.
 23. Build AWCMS parity harness.
-24. Port/implement modules vertically in dependency order.
+24. Port/implement modules vertically in dependency order, each slice as 11.1 → 11.2 → 11.3.
 25. Validate every module against contract/security/RLS/parity tests.
 26. Benchmark representative flows.
 27. Deploy production-like staging.
@@ -2146,6 +2157,12 @@ contract/security tests
 ```
 
 This exposes integration and security mistakes early.
+
+Within each slice the order is **11.1 frontend → 11.2 backend → 11.3 integration**:
+
+1. **11.1 Frontend** — the consumer builds against the mock generated from the OpenAPI/AsyncAPI contract (step 8). Where no AWBMS-specific frontend exists, this is the consumer's own work and AWBMS contributes only the contract and its mock.
+2. **11.2 Backend** — the sequence above, fulfilling the same contract. Authorisation is enforced here and in PostgreSQL RLS, never only in the frontend.
+3. **11.3 Integration** — contract tests (consumer fixtures against the real backend) and E2E, run before the slice is called done.
 
 A module is not “ported” merely because its tables and endpoints compile.
 

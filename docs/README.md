@@ -70,7 +70,7 @@ These are absences, recorded so that nobody mistakes them for oversights.
 | Gap | Blocked on | Tracked as |
 |---|---|---|
 | AWCMS inventory frozen but `VG-01` still **partial** — `C-04`/`C-05` gates not yet marked enforced/advisory/absent | per-gate determination | `VG-01` |
-| No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–7 | §49.2, `OD-06` |
+| No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–3 and 5–8 | §49.2, `OD-06` |
 | No AWBMS application module — the workspace holds only `crates/verification` | Blueprint sign-off, §51 step 10 | `VG-02` |
 | No performance baseline for AWBMS or AWCMS | benchmark corpus, §23.1 | `VG-09`, `OD-04` |
 | No licence file, and no dependency licence allow-list | an ownership decision nobody has recorded | `OD-08` |
@@ -88,5 +88,5 @@ now exist. `docs/security/` is a placeholder.
 
 The [engineering lifecycle in
 §50](architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md#50-mandatory-engineering-lifecycle)
-lists eighteen stages. Stage 1 — the Master Blueprint — has not begun. Its
+lists eighteen stages (product development flow v2.0.0, [`ADR-0004`](adr/0004-adopt-product-development-flow-v2.md)). Stage 1 — the Master Blueprint — has not begun. Its
 required contents are in §49.2, and its entry conditions in §49.1.

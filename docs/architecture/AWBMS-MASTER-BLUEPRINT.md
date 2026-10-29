@@ -1105,6 +1105,7 @@ These decisions are proposed as Stage-1 Blueprint decisions and should be assign
 
 Stage 2 should convert the architectural scope into:
 
+- user research inputs (usage context, personas / jobs-to-be-done), mandatory under lifecycle v2 step 2;
 - stakeholders/personas;
 - business capabilities;
 - prioritized user/system requirements;

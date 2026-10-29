@@ -33,7 +33,7 @@ in the architecture validation:
 |---|---|---|
 | Threat model | §50 step 3 | Master Blueprint |
 | Privacy analysis / DPIA | §50 step 3 | Master Blueprint |
-| RBAC + ABAC + RLS matrix | §50 step 5 | ERD, §50 step 4 |
+| RBAC + ABAC + RLS matrix | §50 step 6 | ERD, §50 step 5 |
 | Security test corpus | §46 | implementation |
 | Authorization vectors imported from AWCMS | §2.2 | `VG-01` |
 | Dependency policy (`deny.toml`, licence allow-list) | §27, §34 | Cargo workspace |
