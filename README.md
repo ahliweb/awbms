@@ -8,6 +8,7 @@ stage.
 | Version | see [`VERSION`](VERSION) · [`CHANGELOG.md`](CHANGELOG.md) |
 | Stage | pre-Blueprint · conditionally approved to begin Stage 1 |
 | Repository state | Stage 1 in progress — Blueprint, frozen AWCMS inventory, and a Rust verification spike |
+| Production status | **NOT PRODUCTION READY** — no production deployment exists; see [`SECURITY.md`](SECURITY.md) |
 
 ## What this repository is right now
 
@@ -101,4 +102,4 @@ not discharged.
 
 ## Licence
 
-Not yet determined. See [`docs/README.md`](docs/README.md#known-gaps).
+AWBMS is released under the [MIT License](LICENSE). Copyright (c) 2026 AhliWeb.
