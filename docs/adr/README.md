@@ -47,6 +47,7 @@ project's own argument against maintaining the same statement in two places.
 | [0002](0002-semantic-versioning-and-changesets.md) | Semantic versioning with `vX.Y.Z` and changesets | Accepted |
 | [0003](0003-executable-documentation-gate.md) | Documentation correctness is an executable gate | Accepted |
 | [0004](0004-adopt-product-development-flow-v2.md) | Adopt product development flow v2.0.0 | Accepted |
+| [0005](0005-licence-mit-and-dependency-licence-allow-list.md) | License AWBMS under MIT and enforce a dependency licence allow-list | Accepted |
 
 ## Writing one
 

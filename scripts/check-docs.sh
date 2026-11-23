@@ -309,10 +309,12 @@ elif ! command -v python3 >/dev/null 2>&1; then
   fail "python3 is required to validate $GATES_JSON"
 else
   SHALLOW="$(git rev-parse --is-shallow-repository 2>/dev/null || echo true)"
+  GATES_DONE=0
   while IFS= read -r line; do
     case "$line" in
       "ok "*)   pass "${line#ok }" ;;
       "FAIL "*) fail "${line#FAIL }" ;;
+      "__GATES_DONE__") GATES_DONE=1 ;;
       *)        note "$line" ;;
     esac
   done <<EOF
@@ -410,6 +412,9 @@ for g in gates:
     chk = g["check"]
     if chk is None:
         continue
+    if not isinstance(chk, dict):
+        bad("%s: check must be null or an object with a kind, got %r" % (g["id"], chk))
+        continue
     gid, kind = g["id"], chk.get("kind")
     if kind == "script":
         found = os.path.isfile(chk.get("path", ""))
@@ -459,10 +464,13 @@ if os.path.isfile(arch_path):
     else:
         ok("architecture validation Appendix E statuses agree with the register")
 
+out.append("__GATES_DONE__")
 print("\n".join(out))
 PY
 )
 EOF
+  # A crash in the validator must fail the gate, not silently drop its checks.
+  [ "$GATES_DONE" = 1 ] || fail "gate register validator did not complete (python error above)"
 fi
 
 # ------------------------------------------------------------------ summary

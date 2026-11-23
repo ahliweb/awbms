@@ -35,9 +35,8 @@ in the architecture validation:
 | Privacy analysis / DPIA | §50 step 3 | Master Blueprint |
 | RBAC + ABAC + RLS matrix | §50 step 6 | ERD, §50 step 5 |
 | Security test corpus | §46 | implementation |
-| Authorization vectors imported from AWCMS | §2.2 | `VG-01` |
-| Dependency policy (`deny.toml`, licence allow-list) | §27, §34 | Cargo workspace |
-| Incident response and disclosure process | — | an owner |
+| Executable authorization parity harness (vectors are frozen as prose in `contracts/legacy/awcms/authorization/`) | §2.2 | `VG-01`, `VG-05` |
+| Incident response process (vulnerability disclosure is in [`SECURITY.md`](../../SECURITY.md)) | — | an owner |
 | Standards control mapping with evidence | §35 | deployment |
 
 ## Compliance status
@@ -52,5 +51,11 @@ evidence in addition to software controls, and no such evidence exists.
 
 ## Reporting a vulnerability
 
-There is no code to attack yet. When there is, a disclosure process belongs
-here, and its absence is tracked in the gap table above.
+Report vulnerabilities privately as described in [`SECURITY.md`](../../SECURITY.md).
+
+## Supply chain
+
+The dependency policy is in force: `deny.toml` (licence allow-list set by
+[ADR-0005](../adr/0005-licence-mit-and-dependency-licence-allow-list.md),
+advisories, bans, sources) is enforced by `cargo deny` and `cargo audit` in CI.
+Policy and exception handling: [`supply-chain.md`](supply-chain.md).

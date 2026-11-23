@@ -43,39 +43,38 @@ Every frozen artifact MUST record:
 - AWBMS check/test consuming it;
 - disposition when superseded.
 
-## Planned directory shape
+## Directory shape
 
 ```text
 contracts/legacy/awcms/
 ├── README.md
-├── manifest.json
-├── modules/
-├── migrations/
-├── database/
-│   ├── tables-rls.json
-│   └── roles-grants.json
-├── routes/
-├── openapi/
-├── asyncapi/
+├── manifest.json            # VG-01 artifact register
+├── fixture-usage.json       # every frozen file → the check that consumes it
 ├── authorization/
-├── gates/
-├── astro-consumer/
-└── fixtures/
+│   └── vectors.json         # authorization vectors (prose input/expected)
+└── frozen/
+    ├── provenance.json      # pinned AWCMS / AWCMS-Astro SHAs, toolchain
+    ├── static/              # deterministic source inventory + pinned source copies
+    └── live/                # controlled live PostgreSQL RLS / role introspection
 ```
+
+Frozen files are published only through the `vg01-freeze` workflow
+(generation with a read-only token, publication by pull request), and
+`tools/vg01_verify_frozen.sh` fails CI on any orphan fixture or stale source SHA.
 
 ## What is NOT yet proven
 
-This README does not discharge `VG-01`. In particular, AWBMS does not yet contain:
+This README does not discharge `VG-01`; the gate is **PARTIAL** in the
+[Stage 1 gate register](../../../docs/architecture/AWBMS-STAGE-1-GATES.md). The
+per-criterion state is in
+[`VG-01-executable-coverage-2026-11-23.md`](../../../docs/architecture/evidence/VG-01-executable-coverage-2026-11-23.md).
+Still missing:
 
-- the re-runnable inventory generator;
-- per-file migration SHA-256 inventory;
-- live PostgreSQL `pg_class` / `pg_policy` RLS introspection;
-- live role/grant introspection;
-- complete route/auth ownership inventory;
-- frozen OpenAPI/AsyncAPI copies;
-- authorization vectors;
-- the full AWCMS-Astro consumer fixture;
-- artifact-to-test usage checks.
+- an AWCMS gate inventory classified as enforced / advisory / absent (only the raw CI and package files are frozen);
+- an executable harness for the authorization vectors (they are frozen as prose);
+- a complete route inventory with owning module and auth classification (only counts are frozen);
+- representative request/response behaviour fixtures for parity tests;
+- per-file migration SHA-256 checked against the SQL itself (needs the pinned AWCMS checkout, i.e. a `vg01-freeze` run).
 
 Static repository inventory is not a substitute for live database evidence where the gate requires live state.
 
