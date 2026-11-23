@@ -50,6 +50,7 @@ project's own argument against maintaining the same statement in two places.
 | [0005](0005-licence-mit-and-dependency-licence-allow-list.md) | License AWBMS under MIT and enforce a dependency licence allow-list | Accepted |
 | [0006](0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09 | Accepted |
 | [0007](0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Keep the VG-01 legacy baseline pinned for Stage 1 | Accepted |
+| [0008](0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) | Close OD-03, OD-05 and OD-06, resolve the assumption register, and sign off Stage 1 | Accepted |
 
 ## Writing one
 

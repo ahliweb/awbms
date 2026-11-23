@@ -3,7 +3,7 @@
 **Project:** AWBMS — AhliWeb Backend Management System  
 **Repository:** `ahliweb/awbms`  
 **Lifecycle Stage:** Stage 1 — Master Blueprint  
-**Document status:** **DRAFT / IN PROGRESS — NOT YET APPROVED FOR STAGE 2**  
+**Document status:** **APPROVED — Stage 1 signed off 2026-11-23 ([ADR-0008](../adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md)); approved for Stage 2 (PRD), not for implementation**  
 **Prepared:** 2026-08-29  
 **Architecture basis:** `docs/architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md` v1.1  
 **AWBMS observed HEAD:** `a646bf24c809e2d47c3cb8b9eedeeab82a619cc6`  
@@ -997,7 +997,7 @@ The Stage-1 sign-off requirements in [§31](#31-recommended-stage-transition) ar
 | R2/provider APIs can be abstracted behind ports | adapter spike | integration test |
 | Product SLOs are not yet fixed | Stage-2 PRD | explicit PRD values or tier policy |
 
-Any falsified assumption reopens dependent decisions.
+Any falsified assumption reopens dependent decisions. Resolution of the validation's formal register (`AS-01`–`AS-08`) is recorded in ADR-0008; product SLOs have initial values there, confirmed in the Stage 2 PRD.
 
 ---
 
@@ -1016,7 +1016,7 @@ Stage 1 may be signed off only when:
 9. AWCMS invariant → AWBMS control → test/evidence traceability exists.
 10. explicit approval record identifies the accountable approver.
 
-Until then, status remains **Stage 1 — In Progress**.
+All ten were met on 2026-11-23 (gate register, ADR-0006, ADR-0008, validation Appendices F and G); status is **Stage 1 — Signed off**.
 
 ---
 
@@ -1087,14 +1087,14 @@ Perform cross-document review and formally record Stage-1 approval only after ga
 | `AD-S1-07` | AWCMS-Astro commit/path inventory is part of `VG-01`, not optional context |
 | `AD-S1-08` | No normative crate versions are duplicated in Blueprint prose |
 
-These decisions are proposed as Stage-1 Blueprint decisions and should be assigned owner/date when committed to the repository.
+These decisions were accepted by the repository owner on 2026-11-23 through ADR-0006 (§8–§11) and ADR-0008 (Stage 1 sign-off).
 
 ---
 
 ## 31. Recommended Stage Transition
 
-**Current:** Stage 1 has begun.  
-**Not ready:** Stage 1 sign-off.  
+**Current:** Stage 1 signed off 2026-11-23 (ADR-0008).  
+**Not yet:** implementation — waits for gate 9.  
 **Next after Stage-1 completion:** Stage 2 — AWBMS PRD.
 
 Stage 2 should convert the architectural scope into:

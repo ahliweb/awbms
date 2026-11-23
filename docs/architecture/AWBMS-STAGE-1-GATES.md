@@ -1,6 +1,6 @@
 # AWBMS Stage 1 — Verification Gate Register
 
-**Status:** Stage 1 in progress  
+**Status:** Stage 1 signed off 2026-11-23 ([ADR-0008](../adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md))  
 **Issue:** `#1`  
 **Purpose:** authoritative Stage-1 evidence register derived from the architecture validation and Master Blueprint.
 
@@ -58,7 +58,7 @@ VG-03 toolchain pin (PASS)
        |
 VG-04 verification spike (PASS)
        |
-       +----> Stage 1 may be signed off only after open decisions + assumptions/approval
+       +----> Stage 1 signed off 2026-11-23 (open decisions, assumptions, approval: ADR-0006, ADR-0008)
                  |
                  v
              Stage 2 PRD
@@ -74,6 +74,6 @@ VG-15 independence (continuous)
 
 Stage 1 MUST remain `IN PROGRESS` while any Blueprint-blocking assumption is unresolved or while `VG-01`, `VG-03`, or `VG-04` is not PASS.
 
-`VG-01`, `VG-03` and `VG-04` are now PASS ([VG-01 record](evidence/VG-01-PASS-2026-11-23.md)). Stage 1 still remains `IN PROGRESS` because Blueprint-blocking open decisions (`OD-03`, `OD-05`, `OD-06`), the assumption register and the owner's approval are not yet closed.
+`VG-01`, `VG-03` and `VG-04` are PASS, all Blueprint-blocking open decisions are closed (ADR-0006, ADR-0008), every assumption is resolved, and the owner's approval is recorded. **Stage 1 is signed off (2026-11-23).** Stage 2 (PRD) is next; implementation still waits for gate 9.
 
 No later implementation result retroactively substitutes for missing Stage-1 evidence; findings must update the Blueprint and decision register explicitly.

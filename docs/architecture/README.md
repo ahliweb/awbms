@@ -32,8 +32,8 @@ than front to back.
    selection.
 3. **Appendix C — Decision register.** The authoritative form of §1, with
    rationale, consequence and gate per decision.
-4. **Appendix D — Open decisions.** What is *not* decided. Three still block
-   Blueprint sign-off (`OD-03`, `OD-05`, `OD-06`); closed entries link their ADR.
+4. **Appendix D — Open decisions.** What is *not* decided. None blocks Blueprint
+   sign-off any more (Stage 1 signed off 2026-11-23); closed entries link their ADR.
 5. **Appendix E — Verification gates.** What evidence would make any of this
    more than a proposal. Current status is in the Stage 1 gate register; no gate
    covering AWBMS behaviour (parity, performance, recovery) has passed.
@@ -78,8 +78,8 @@ keeping the auditable surface small enough to actually audit.
 
 No threat model, ERD, data dictionary, RBAC/ABAC/RLS matrix, API contract, SLO
 target, or implementation plan. Those are deliverables of the later lifecycle steps listed
-in §49.2 and §50; the Master Blueprint (Stage 1) is in progress and does not
-yet contain them.
+in §49.2 and §50; the Master Blueprint (Stage 1, signed off) does not contain
+them; they belong to Stage 2 onward.
 
 No measurement of any kind. §23 is explicit that no benchmark has been designed
 or run, and that no number in it may be quoted as a result.
