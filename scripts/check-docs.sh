@@ -150,7 +150,7 @@ group "Internal link integrity"
 # satisfy a link checker would invalidate the SHA-256 provenance that makes them
 # evidence, so they are excluded from documentation checks by design.
 DOCS="$(find . -name '*.md' -not -path './.git/*' -not -path './contracts/legacy/*' \
-        -not -path './target/*' | sort)"
+        -not -path './target/*' -not -path './.claude/worktrees/*' | sort)"
 
 SLUG_CACHE_DIR="$(mktemp -d)"
 trap 'rm -rf "$SLUG_CACHE_DIR"' EXIT
@@ -239,7 +239,7 @@ else
 fi
 
 COUPLED=0
-for manifest in $(find . -name Cargo.toml -not -path './.git/*' -not -path './target/*' 2>/dev/null); do
+for manifest in $(find . -name Cargo.toml -not -path './.git/*' -not -path './target/*' -not -path './.claude/worktrees/*' 2>/dev/null); do
   if grep -Eq '(path|git)[[:space:]]*=[[:space:]]*"[^"]*awcms' "$manifest"; then
     fail "$manifest declares a path/git dependency on AWCMS (§3.2)"
     COUPLED=1
