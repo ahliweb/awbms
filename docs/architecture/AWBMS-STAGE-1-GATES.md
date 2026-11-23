@@ -4,6 +4,8 @@
 **Issue:** `#1`  
 **Purpose:** authoritative Stage-1 evidence register derived from the architecture validation and Master Blueprint.
 
+The status of each gate is also recorded in the machine-readable register [`gates.json`](gates.json), together with its evidence paths, executable check and, for a PASS gate, the AWBMS commit and workflow run that established it. `scripts/check-docs.sh` fails when the table below and `gates.json` disagree, when a PASS gate lacks evidence or a recorded commit/run, or when a gate with a present executable check is described as lacking automation. Final-main run record: [`MAIN-VERIFICATION-2026-11-23.md`](evidence/MAIN-VERIFICATION-2026-11-23.md).
+
 A gate is **PASS** only when its named evidence exists and its pass/fail rule can be independently checked. Documentation that merely describes future evidence is not a passed gate.
 
 ## Gate Register
@@ -16,7 +18,7 @@ A gate is **PASS** only when its named evidence exists and its pass/fail rule ca
 | `VG-05` | Correctness/security parity | **OPEN** | golden request/response/DB/auth/audit/event corpus | committed compatibility scope has no unexplained semantic diff |
 | `VG-09` | Establish performance evidence | **OPEN** | reproducible benchmark corpus + environment manifest | measurements are repeatable and satisfy approved baseline/no-regression policy |
 | `VG-12` | Prove recovery/rollback | **OPEN** | backup/restore + cutover rollback rehearsal | restore and routing/worker rollback complete within approved recovery criteria |
-| `VG-15` | Preserve repository independence | **CURRENTLY TRUE / UNAUTOMATED** | dependency/source/runtime coupling check | no AWCMS source/runtime dependency, submodule, path dependency, or production filesystem coupling |
+| `VG-15` | Preserve repository independence | **PASS** | dependency/source/runtime coupling check (`tools/vg15_independence.rs`, run in CI; plus `scripts/check-docs.sh`) | no AWCMS source/runtime dependency, submodule, path dependency, or production filesystem coupling |
 
 ## VG-01 Required Artifact Set
 

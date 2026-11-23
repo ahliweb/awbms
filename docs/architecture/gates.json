@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "description": "Machine-readable Stage-1 gate register. Validated against docs/architecture/AWBMS-STAGE-1-GATES.md by scripts/check-docs.sh. A PASS gate must name existing evidence paths and the AWBMS commit and workflow run that established it.",
+  "gates": [
+    {
+      "id": "VG-01",
+      "title": "Freeze AWCMS/AWCMS-Astro source-of-truth inputs",
+      "status": "PARTIAL",
+      "evidence": ["contracts/legacy/awcms/manifest.json"],
+      "check": null,
+      "established": null
+    },
+    {
+      "id": "VG-03",
+      "title": "Resolve/pin Rust toolchain",
+      "status": "PASS",
+      "evidence": [
+        "rust-toolchain.toml",
+        "Cargo.lock",
+        "docs/architecture/evidence/VG-03-VG-04-2026-08-29.md",
+        "docs/architecture/evidence/MAIN-VERIFICATION-2026-11-23.md"
+      ],
+      "check": {
+        "kind": "workflow",
+        "file": ".github/workflows/verification.yml",
+        "job": "VG-03 / VG-04 Rust + PostgreSQL verification"
+      },
+      "established": {
+        "commit": "59cc2c3ac5705cb8e50476249aad82026569de57",
+        "run": 45097211873
+      }
+    },
+    {
+      "id": "VG-04",
+      "title": "Validate Axum/Tokio/SQLx/PostgreSQL fit",
+      "status": "PASS",
+      "evidence": [
+        "crates/verification/tests/rls.rs",
+        "docs/architecture/evidence/VG-03-VG-04-2026-08-29.md",
+        "docs/architecture/evidence/MAIN-VERIFICATION-2026-11-23.md"
+      ],
+      "check": {
+        "kind": "workflow",
+        "file": ".github/workflows/verification.yml",
+        "job": "VG-03 / VG-04 Rust + PostgreSQL verification"
+      },
+      "established": {
+        "commit": "59cc2c3ac5705cb8e50476249aad82026569de57",
+        "run": 45097211873
+      }
+    },
+    {
+      "id": "VG-05",
+      "title": "Correctness/security parity",
+      "status": "OPEN",
+      "evidence": [],
+      "check": null,
+      "established": null
+    },
+    {
+      "id": "VG-09",
+      "title": "Establish performance evidence",
+      "status": "OPEN",
+      "evidence": [],
+      "check": null,
+      "established": null
+    },
+    {
+      "id": "VG-12",
+      "title": "Prove recovery/rollback",
+      "status": "OPEN",
+      "evidence": [],
+      "check": null,
+      "established": null
+    },
+    {
+      "id": "VG-15",
+      "title": "Preserve repository independence",
+      "status": "PASS",
+      "evidence": [
+        "tools/vg15_independence.rs",
+        "docs/architecture/evidence/MAIN-VERIFICATION-2026-11-23.md"
+      ],
+      "check": {
+        "kind": "script",
+        "path": "tools/vg15_independence.rs"
+      },
+      "established": {
+        "commit": "59cc2c3ac5705cb8e50476249aad82026569de57",
+        "run": 45097211873
+      }
+    }
+  ]
+}

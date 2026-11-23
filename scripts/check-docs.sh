@@ -17,6 +17,9 @@
 #   7  Repository independence (VG-15): no AWCMS submodule or build dependency
 #   8  Every changeset is well-formed
 #   9  Scripts are executable
+#   10 Gate register (docs/architecture/gates.json) agrees with the gates
+#      document and the architecture validation; PASS gates carry evidence,
+#      a commit and a run; no gate with an existing check is "unautomated"
 #
 # Usage: scripts/check-docs.sh [--quiet]
 
@@ -286,6 +289,180 @@ if command -v shellcheck >/dev/null 2>&1; then
   fi
 else
   note "shellcheck not installed; skipped (optional)"
+fi
+
+# ------------------------------------------------------- 10 gate register
+group "Gate register (docs/architecture/gates.json)"
+
+GATES_JSON="docs/architecture/gates.json"
+GATES_DOC="docs/architecture/AWBMS-STAGE-1-GATES.md"
+
+# The register is the machine-readable source of gate status; the Markdown
+# table, the architecture validation and the evidence are checked against it.
+# Python 3 (stdlib only) parses the JSON; it prints one "ok"/"FAIL" line per
+# finding, which is turned into pass/fail below.
+if [ ! -f "$GATES_JSON" ]; then
+  fail "$GATES_JSON is missing"
+elif [ ! -f "$GATES_DOC" ]; then
+  fail "$GATES_DOC is missing"
+elif ! command -v python3 >/dev/null 2>&1; then
+  fail "python3 is required to validate $GATES_JSON"
+else
+  SHALLOW="$(git rev-parse --is-shallow-repository 2>/dev/null || echo true)"
+  while IFS= read -r line; do
+    case "$line" in
+      "ok "*)   pass "${line#ok }" ;;
+      "FAIL "*) fail "${line#FAIL }" ;;
+      *)        note "$line" ;;
+    esac
+  done <<EOF
+$(python3 -I - "$GATES_JSON" "$GATES_DOC" "$ARCH_DOC" "$SHALLOW" <<'PY'
+import json, os, re, subprocess, sys
+
+reg_path, doc_path, arch_path, shallow = sys.argv[1:5]
+out = []
+ok = lambda m: out.append("ok " + m)
+bad = lambda m: out.append("FAIL " + m)
+
+try:
+    with open(reg_path, encoding="utf-8") as fh:
+        reg = json.load(fh)
+    gates = reg["gates"]
+except (OSError, ValueError, KeyError) as exc:
+    print("FAIL %s is not a valid register: %s" % (reg_path, exc))
+    sys.exit(0)
+
+STATUSES = {"PASS", "PARTIAL", "OPEN"}
+HEX40 = re.compile(r"^[0-9a-f]{40}$")
+ids = [g.get("id") for g in gates]
+problems = []
+if len(set(ids)) != len(ids):
+    problems.append("duplicate gate ids")
+for g in gates:
+    gid = g.get("id", "?")
+    for key in ("id", "title", "status", "evidence", "check", "established"):
+        if key not in g:
+            problems.append("%s lacks '%s'" % (gid, key))
+    if g.get("status") not in STATUSES:
+        problems.append("%s has status %r, expected one of %s" % (gid, g.get("status"), sorted(STATUSES)))
+if problems:
+    bad("register schema: " + "; ".join(problems))
+    print("\n".join(out))
+    sys.exit(0)
+ok("register has %d well-formed gates" % len(gates))
+
+# (a) The Markdown status table must equal the register exactly.
+rows = []
+with open(doc_path, encoding="utf-8") as fh:
+    for line in fh:
+        if line.startswith("| `VG-"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            rows.append((cells[0].strip("`"), cells[1], cells[2].replace("*", "").strip()))
+want = [(g["id"], g["title"], g["status"]) for g in gates]
+if rows == want:
+    ok("gate table in %s matches the register exactly" % os.path.basename(doc_path))
+else:
+    diffs = []
+    table = {r[0]: r for r in rows}
+    for w in want:
+        r = table.get(w[0])
+        if r is None:
+            diffs.append("%s missing from table" % w[0])
+        elif r != w:
+            diffs.append("%s table=%r register=%r" % (w[0], r[1:], w[1:]))
+    for r in rows:
+        if r[0] not in ids:
+            diffs.append("%s in table but not in register" % r[0])
+    if not diffs:
+        diffs.append("row order differs from the register")
+    bad("gate table differs from register: " + "; ".join(diffs))
+
+# (b) A PASS gate needs existing evidence, a recorded commit and a run id.
+for g in gates:
+    gid, why = g["id"], []
+    for path in g["evidence"]:
+        if not os.path.exists(path):
+            why.append("evidence path missing: " + path)
+    if g["status"] == "PASS":
+        if not g["evidence"]:
+            why.append("no evidence paths")
+        est = g["established"] or {}
+        commit, run = est.get("commit", ""), est.get("run")
+        if not HEX40.match(str(commit)):
+            why.append("no valid 40-hex commit recorded")
+        elif shallow != "true":
+            r = subprocess.run(["git", "cat-file", "-e", commit + "^{commit}"],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if r.returncode != 0:
+                why.append("recorded commit %s is not in this repository" % commit[:12])
+        if not isinstance(run, int) or isinstance(run, bool) or run <= 0:
+            why.append("no workflow run id recorded")
+    if why:
+        bad("%s (%s): %s" % (gid, g["status"], "; ".join(why)))
+    else:
+        ok("%s (%s): evidence present%s" % (gid, g["status"],
+            ", commit/run recorded" if g["status"] == "PASS" else ""))
+
+# The registered executable check must exist, and no document may call a gate
+# with an existing check unautomated.
+automated = set()
+for g in gates:
+    chk = g["check"]
+    if chk is None:
+        continue
+    gid, kind = g["id"], chk.get("kind")
+    if kind == "script":
+        found = os.path.isfile(chk.get("path", ""))
+    elif kind == "workflow":
+        found = False
+        if os.path.isfile(chk.get("file", "")):
+            with open(chk["file"], encoding="utf-8") as fh:
+                found = ("name: " + chk.get("job", "\0")) in fh.read()
+    else:
+        found = False
+    if found:
+        automated.add(gid)
+        ok("%s: registered executable check exists" % gid)
+    else:
+        bad("%s: registered executable check not found: %r" % (gid, chk))
+
+# (c) Prose must not call a gate unautomated while its check exists.
+stale = []
+for path in (doc_path, arch_path):
+    if not os.path.isfile(path):
+        continue
+    with open(path, encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            if re.search(r"unautomated", line, re.I):
+                for gid in re.findall(r"VG-\d\d", line):
+                    if gid in automated:
+                        stale.append("%s:%d (%s)" % (path, n, gid))
+if stale:
+    bad("described as unautomated although its executable check exists: " + ", ".join(stale))
+else:
+    ok("no gate with an existing executable check is described as unautomated")
+
+# The architecture validation's Appendix E status must agree with the register.
+if os.path.isfile(arch_path):
+    arch = {}
+    with open(arch_path, encoding="utf-8") as fh:
+        for line in fh:
+            m = re.match(r"^\| `(VG-\d\d)` \|", line)
+            if m:
+                cells = [c.strip() for c in line.strip().strip("|").split("|")]
+                word = re.match(r"\**\s*([A-Za-z]+)", cells[-1])
+                arch[m.group(1)] = word.group(1).upper() if word else ""
+    mism = ["%s arch=%s register=%s" % (g["id"], arch.get(g["id"]), g["status"])
+            for g in gates if arch.get(g["id"]) != g["status"]]
+    if mism:
+        bad("architecture validation Appendix E disagrees with the register: " + "; ".join(mism))
+    else:
+        ok("architecture validation Appendix E statuses agree with the register")
+
+print("\n".join(out))
+PY
+)
+EOF
 fi
 
 # ------------------------------------------------------------------ summary
