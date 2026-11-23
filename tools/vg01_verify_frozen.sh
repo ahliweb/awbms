@@ -66,4 +66,14 @@ if find "$ROOT/frozen" -type l -print -quit | grep -q .; then
   exit 1
 fi
 
-echo "VG-01 frozen static/live evidence and authorization vector register verified"
+# Executable consumption: cross-check the fixtures against each other, detect
+# stale source SHAs, and fail on orphan fixtures / dangling fixture-usage.json
+# consumers. std-only Rust, same build style as the other VG-01 tools.
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+CHECK_TMP=$(mktemp -d)
+trap 'rm -rf "$CHECK_TMP"' EXIT
+rustc --edition 2024 -D warnings "$REPO_ROOT/tools/vg01_check_corpus.rs" -o "$CHECK_TMP/vg01_check_corpus"
+"$CHECK_TMP/vg01_check_corpus" "$ROOT" "$REPO_ROOT"
+
+echo "VG-01 frozen static/live evidence, authorization vector register and corpus consistency verified"
