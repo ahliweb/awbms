@@ -1,7 +1,8 @@
 # Security documentation
 
-**This directory is a placeholder.** It contains no security analysis, because
-none has been performed.
+**Security analysis here is draft specification.** The initial threat model
+and privacy analysis (lifecycle step 3) exist as drafts awaiting human security
+and legal review; no control is implemented or reviewed yet.
 
 Saying so explicitly matters more than it might appear. An empty `docs/security/`
 directory in a repository whose architecture document discusses RLS, RBAC,
@@ -9,6 +10,13 @@ ABAC, Separation of Duties and OWASP ASVS invites the assumption that security
 work has happened somewhere. It has not.
 
 ## What exists today
+
+| Document | Status |
+|---|---|
+| [Initial threat model](AWBMS-THREAT-MODEL.md) — DFD, trust boundaries, STRIDE `THR-001`…`THR-063`, proposed requirements `PRQ-` | Draft — awaiting human security review |
+| [Privacy analysis](AWBMS-PRIVACY-ANALYSIS.md) — personal-data inventory, classification, retention, DPIA risks `DPR-`, proposed requirements `PPRQ-` | Draft — awaiting privacy/legal review; not legal advice |
+| [Supply-chain policy](supply-chain.md) | Current |
+
 
 Security *architecture* — controls proposed, not implemented or reviewed — is
 in the architecture validation:
@@ -31,8 +39,7 @@ in the architecture validation:
 
 | Missing | Required by | Blocked on |
 |---|---|---|
-| Threat model | §50 step 3 | Master Blueprint |
-| Privacy analysis / DPIA | §50 step 3 | Master Blueprint |
+| Human review of the threat model and privacy analysis | §50 step 3 | a security reviewer and counsel |
 | RBAC + ABAC + RLS matrix | §50 step 6 | ERD, §50 step 5 |
 | Security test corpus | §46 | implementation |
 | Executable authorization parity harness (vectors are frozen as prose in `contracts/legacy/awcms/authorization/`) | §2.2 | `VG-01`, `VG-05` |

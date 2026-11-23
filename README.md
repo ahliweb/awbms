@@ -6,7 +6,7 @@ stage.
 | | |
 |---|---|
 | Version | see [`VERSION`](VERSION) · [`CHANGELOG.md`](CHANGELOG.md) |
-| Stage | Stage 1 (Master Blueprint) signed off 2026-11-23 · Stage 2 [PRD](docs/product/AWBMS-PRD.md) accepted 2026-11-23 (ADR-0009) · step 3 (threat model + privacy analysis) in progress · implementation waits for gate 9 |
+| Stage | Stage 1 (Master Blueprint) signed off 2026-11-23 · Stage 2 [PRD](docs/product/AWBMS-PRD.md) accepted 2026-11-23 (ADR-0009) · step 3 [threat model](docs/security/AWBMS-THREAT-MODEL.md) + [privacy analysis](docs/security/AWBMS-PRIVACY-ANALYSIS.md) drafted, awaiting human review · implementation waits for gate 9 |
 | Repository state | Approved Blueprint, frozen AWCMS inventory (`VG-01` PASS), and a Rust verification spike |
 | Production status | **NOT PRODUCTION READY** — no production deployment exists; see [`SECURITY.md`](SECURITY.md) |
 
