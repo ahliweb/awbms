@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "structuredSchemaVersion": 1,
   "gate": "VG-01",
   "sources": {
     "awcms": "11f2e95a47b1328a820f976d60f978c38a067903",
@@ -11,98 +12,447 @@
       "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
       "class": "machine-credential-tenant-binding",
       "input": "valid machine credential with no asserted tenant",
-      "expected": "tenant is derived from the machine credential and asserted=false"
+      "expected": "tenant is derived from the machine credential and asserted=false",
+      "structured": {
+        "actor": "machine-credential",
+        "credentialClass": "awcmsm-machine-credential",
+        "tenantRelation": "credential-bound",
+        "operations": [
+          {
+            "kind": "build-function",
+            "repository": "ahliweb/awcms-astro",
+            "file": "src/lib/awcms/tenant.ts",
+            "name": "resolveTenant"
+          }
+        ],
+        "expectedDecision": "allow",
+        "expectedStatus": null,
+        "testKind": "behavioural-unit",
+        "citation": {
+          "repository": "ahliweb/awcms-astro",
+          "path": "tests/kontrak-awcms.test.mjs",
+          "test": "token mesin menentukan tenant tanpa variabel lain",
+          "frozenCopy": "frozen/static/source/awcms-astro-contract.test.mjs"
+        }
+      }
     },
     {
       "id": "ASTRO-TENANT-002",
       "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
       "class": "machine-credential-tenant-binding",
       "input": "valid machine credential plus matching AWCMS_TENANT_ID, case-insensitive UUID",
-      "expected": "tenant matches credential and asserted=true"
+      "expected": "tenant matches credential and asserted=true",
+      "structured": {
+        "actor": "machine-credential",
+        "credentialClass": "awcmsm-machine-credential",
+        "tenantRelation": "credential-bound-header-matching",
+        "operations": [
+          {
+            "kind": "build-function",
+            "repository": "ahliweb/awcms-astro",
+            "file": "src/lib/awcms/tenant.ts",
+            "name": "resolveTenant"
+          }
+        ],
+        "expectedDecision": "allow",
+        "expectedStatus": null,
+        "testKind": "behavioural-unit",
+        "citation": {
+          "repository": "ahliweb/awcms-astro",
+          "path": "tests/kontrak-awcms.test.mjs",
+          "test": "AWCMS_TENANT_ID yang cocok menandai hasil sebagai terverifikasi",
+          "frozenCopy": "frozen/static/source/awcms-astro-contract.test.mjs"
+        }
+      }
     },
     {
       "id": "ASTRO-TENANT-003",
       "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
       "class": "fail-closed-tenant-mismatch",
       "input": "valid machine credential plus different AWCMS_TENANT_ID",
-      "expected": "fail closed with tenant-mismatch error before build can consume another tenant"
+      "expected": "fail closed with tenant-mismatch error before build can consume another tenant",
+      "structured": {
+        "actor": "machine-credential",
+        "credentialClass": "awcmsm-machine-credential",
+        "tenantRelation": "credential-bound-header-conflicting",
+        "operations": [
+          {
+            "kind": "build-function",
+            "repository": "ahliweb/awcms-astro",
+            "file": "src/lib/awcms/tenant.ts",
+            "name": "resolveTenant"
+          }
+        ],
+        "expectedDecision": "fail-closed",
+        "expectedStatus": null,
+        "testKind": "behavioural-unit",
+        "citation": {
+          "repository": "ahliweb/awcms-astro",
+          "path": "tests/kontrak-awcms.test.mjs",
+          "test": "AWCMS_TENANT_ID yang berbeda MENGGAGALKAN build",
+          "frozenCopy": "frozen/static/source/awcms-astro-contract.test.mjs"
+        }
+      }
     },
     {
       "id": "ASTRO-TENANT-004",
       "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
       "class": "credential-validation",
       "input": "missing token, human/session bearer, or malformed machine credential",
-      "expected": "reject each invalid credential class; no fallback tenant"
+      "expected": "reject each invalid credential class; no fallback tenant",
+      "structured": {
+        "actor": "machine-credential",
+        "credentialClass": "missing-or-session-or-malformed-token",
+        "tenantRelation": "not-applicable",
+        "operations": [
+          {
+            "kind": "build-function",
+            "repository": "ahliweb/awcms-astro",
+            "file": "src/lib/awcms/tenant.ts",
+            "name": "resolveTenant"
+          }
+        ],
+        "expectedDecision": "deny",
+        "expectedStatus": null,
+        "testKind": "behavioural-unit",
+        "citation": {
+          "repository": "ahliweb/awcms-astro",
+          "path": "tests/kontrak-awcms.test.mjs",
+          "test": "token yang hilang, bukan-mesin, atau cacat ditolak masing-masing dengan sebabnya",
+          "frozenCopy": "frozen/static/source/awcms-astro-contract.test.mjs"
+        }
+      }
     },
     {
       "id": "ASTRO-TENANT-005",
       "source": "ahliweb/awcms-astro:tests/kontrak-awcms.test.mjs",
       "class": "retired-configuration-rejection",
       "input": "AWCMS_TENANT_CODE or AWCMS_DEFAULT_TENANT_CODE is supplied",
-      "expected": "reject retired tenant selectors rather than silently ignoring or trusting them"
+      "expected": "reject retired tenant selectors rather than silently ignoring or trusting them",
+      "structured": {
+        "actor": "machine-credential",
+        "credentialClass": "awcmsm-machine-credential-with-retired-selector",
+        "tenantRelation": "not-applicable",
+        "operations": [
+          {
+            "kind": "build-function",
+            "repository": "ahliweb/awcms-astro",
+            "file": "src/lib/awcms/tenant.ts",
+            "name": "resolveTenant"
+          }
+        ],
+        "expectedDecision": "deny",
+        "expectedStatus": null,
+        "testKind": "behavioural-unit",
+        "citation": {
+          "repository": "ahliweb/awcms-astro",
+          "path": "tests/kontrak-awcms.test.mjs",
+          "test": "variabel rantai lama ditolak, bukan diabaikan",
+          "frozenCopy": "frozen/static/source/awcms-astro-contract.test.mjs"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-PUBLIC-001",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "anti-enumeration",
       "input": "subscribe, confirm, or unsubscribe outcome varies internally",
-      "expected": "public success body remains the single neutral message and does not disclose subscriber state"
+      "expected": "public success body remains the single neutral message and does not disclose subscriber state",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "none",
+        "tenantRelation": "host-or-verified-origin-derived",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/subscribe"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/confirm"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/unsubscribe"
+          }
+        ],
+        "expectedDecision": "neutral-response",
+        "expectedStatus": 200,
+        "testKind": "static-source-assertion",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "each returns exactly ONE success message, built from a constant",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-PUBLIC-002",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "tenant-resolution",
       "input": "anonymous newsletter request",
-      "expected": "tenant derives from verified request host/origin; caller-selected x-tenant-id or auth input cannot choose tenant"
+      "expected": "tenant derives from verified request host/origin; caller-selected x-tenant-id or auth input cannot choose tenant",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "none",
+        "tenantRelation": "host-or-verified-origin-derived",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/subscribe"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/confirm"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/unsubscribe"
+          }
+        ],
+        "expectedDecision": "invariant",
+        "expectedStatus": null,
+        "testKind": "static-source-assertion",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "the tenant comes from the request, never from a header the caller chooses",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-PUBLIC-003",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "abuse-resistance",
       "input": "public newsletter endpoint request",
-      "expected": "shared rate limit is active and threshold is parsed with fail-safe positive-integer handling"
+      "expected": "shared rate limit is active and threshold is parsed with fail-safe positive-integer handling",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "none",
+        "tenantRelation": "host-or-verified-origin-derived",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/subscribe"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/confirm"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/unsubscribe"
+          }
+        ],
+        "expectedDecision": "deny",
+        "expectedStatus": 429,
+        "testKind": "static-source-assertion",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "all three are rate-limited, with a PARSED threshold",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-PUBLIC-004",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "browser-cross-origin-contract",
       "input": "cross-origin JSON POST preflight",
-      "expected": "subscribe, confirm, and unsubscribe expose the required OPTIONS/preflight response"
+      "expected": "subscribe, confirm, and unsubscribe expose the required OPTIONS/preflight response",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "none",
+        "tenantRelation": "not-applicable",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "OPTIONS",
+            "path": "/api/v1/newsletter/subscribe"
+          },
+          {
+            "kind": "http",
+            "method": "OPTIONS",
+            "path": "/api/v1/newsletter/confirm"
+          },
+          {
+            "kind": "http",
+            "method": "OPTIONS",
+            "path": "/api/v1/newsletter/unsubscribe"
+          }
+        ],
+        "expectedDecision": "allow",
+        "expectedStatus": 204,
+        "testKind": "static-source-assertion",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "every route answers the preflight its own JSON contract forces",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-CONSENT-001",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "privacy-consent",
       "input": "subscription submitted but confirmation not completed",
-      "expected": "consent_at is not recorded; consent is written only when confirmation actually gives consent"
+      "expected": "consent_at is not recorded; consent is written only when confirmation actually gives consent",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "none",
+        "tenantRelation": "host-or-verified-origin-derived",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/subscribe"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/confirm"
+          }
+        ],
+        "expectedDecision": "invariant",
+        "expectedStatus": null,
+        "testKind": "static-source-assertion",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "`consent_at` is written by confirm and by nothing else",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-TOKEN-001",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "bearer-secret-protection",
       "input": "confirmation/unsubscribe bearer token",
-      "expected": "token is shape/length checked, hashed for storage, omitted from normal selects and admin display, and compared safely"
+      "expected": "token is shape/length checked, hashed for storage, omitted from normal selects and admin display, and compared safely",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "bearer-token-in-request-body",
+        "tenantRelation": "host-or-verified-origin-derived",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/confirm"
+          },
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/unsubscribe"
+          }
+        ],
+        "expectedDecision": "invariant",
+        "expectedStatus": null,
+        "testKind": "behavioural-unit",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "tokens are 256 bits and hashed, not stored raw",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "NEWSLETTER-UNSUBSCRIBE-001",
       "source": "ahliweb/awcms:tests/newsletter-subscription.test.ts",
       "class": "data-subject-exit",
       "input": "unsubscribe request",
-      "expected": "valid unsubscribe token is sufficient; email/session authentication is not additionally required"
+      "expected": "valid unsubscribe token is sufficient; email/session authentication is not additionally required",
+      "structured": {
+        "actor": "anonymous",
+        "credentialClass": "bearer-token-in-request-body",
+        "tenantRelation": "host-or-verified-origin-derived",
+        "operations": [
+          {
+            "kind": "http",
+            "method": "POST",
+            "path": "/api/v1/newsletter/unsubscribe"
+          }
+        ],
+        "expectedDecision": "allow",
+        "expectedStatus": 200,
+        "testKind": "static-source-assertion",
+        "citation": {
+          "repository": "ahliweb/awcms",
+          "path": "tests/newsletter-subscription.test.ts",
+          "test": "unsubscribe asks for the token and nothing else",
+          "frozenCopy": "frozen/static/source/tests/awcms/tests/newsletter-subscription.test.ts"
+        }
+      }
     },
     {
       "id": "DB-RLS-001",
       "source": "controlled PostgreSQL introspection from pinned AWCMS migrations",
       "class": "tenant-isolation-defense-in-depth",
       "input": "pinned AWCMS schema after 148 migrations",
-      "expected": "134 tables have RLS enabled and FORCE RLS enabled"
+      "expected": "134 tables have RLS enabled and FORCE RLS enabled",
+      "structured": {
+        "actor": "database-role",
+        "credentialClass": "schema-owner-and-runtime-roles",
+        "tenantRelation": "schema-wide",
+        "operations": [
+          {
+            "kind": "database-introspection"
+          }
+        ],
+        "expectedDecision": "invariant",
+        "expectedStatus": null,
+        "testKind": "introspection",
+        "citation": {
+          "evidence": "live-introspection",
+          "frozenFiles": [
+            "frozen/live/tables-rls.csv",
+            "frozen/live/summary.json"
+          ]
+        }
+      }
     },
     {
       "id": "DB-ROLE-001",
       "source": "controlled PostgreSQL introspection from pinned AWCMS migrations",
       "class": "least-privilege-database-roles",
       "input": "schema owner, awcms_app, and awcms_worker after migration bootstrap",
-      "expected": "no listed role is SUPERUSER or BYPASSRLS; app/worker own zero business tables"
+      "expected": "no listed role is SUPERUSER or BYPASSRLS; app/worker own zero business tables",
+      "structured": {
+        "actor": "database-role",
+        "credentialClass": "schema-owner-and-runtime-roles",
+        "tenantRelation": "schema-wide",
+        "operations": [
+          {
+            "kind": "database-introspection"
+          }
+        ],
+        "expectedDecision": "invariant",
+        "expectedStatus": null,
+        "testKind": "introspection",
+        "citation": {
+          "evidence": "live-introspection",
+          "frozenFiles": [
+            "frozen/live/roles.csv",
+            "frozen/live/table-grants.csv",
+            "frozen/live/summary.json"
+          ]
+        }
+      }
     }
-  ]
+  ],
+  "structuredNote": "Each vector's `structured` block is machine-readable and cites a test file and test name at the pinned SHA; the prose fields above are kept unchanged. testKind states what the cited test actually does (static-source-assertion reads route source; it does not send a request). Citations into frozen/static/source/tests/awcms/ resolve once the vg01-freeze run has frozen those copies."
 }

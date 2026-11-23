@@ -54,21 +54,22 @@
   "requiredArtifacts": [
     {"id":"modules","status":"frozen-and-verified"},
     {"id":"migrations-with-sha256","status":"frozen-and-verified"},
+    {"id":"migrations-sha256-vs-sql","status":"implemented-in-ci","check":"tools/vg01_verify_migrations.sh (verification.yml, against the pinned AWCMS checkout)"},
     {"id":"tables-rls","status":"frozen-and-verified"},
     {"id":"live-roles-grants","status":"frozen-and-verified"},
-    {"id":"routes-auth-ownership","status":"pending-structured-inventory"},
+    {"id":"routes-auth-ownership","status":"generator-ready-pending-freeze","artifact":"frozen/static/routes.json","generator":"tools/vg01_inventory.rs","check":"tools/vg01_check_corpus.rs (routes)"},
     {"id":"openapi","status":"frozen-and-verified"},
     {"id":"asyncapi","status":"frozen-and-verified"},
-    {"id":"architectural-gates","status":"source-frozen-pending-structured-inventory"},
-    {"id":"authorization-vectors","status":"frozen-register-pending-parity-execution"},
+    {"id":"architectural-gates","status":"generator-ready-pending-freeze","artifact":"frozen/static/gates.json","generator":"tools/vg01_inventory.rs","check":"tools/vg01_check_corpus.rs (gates)"},
+    {"id":"authorization-vectors","status":"structured-fields-added-citations-resolve-after-freeze","artifact":"authorization/vectors.json","check":"tools/vg01_check_corpus.rs (vectors)"},
     {"id":"astro-consumer-contract","status":"frozen-and-verified"},
-    {"id":"representative-behavior-fixtures","status":"pending"},
+    {"id":"representative-behavior-fixtures","status":"generator-ready-pending-freeze-partial","artifact":"frozen/static/behaviour-fixtures.json","generator":"tools/vg01_inventory.rs","check":"tools/vg01_check_corpus.rs (behaviour-fixtures)"},
     {"id":"artifact-usage-check","status":"implemented","check":"tools/vg01_verify_frozen.sh (fixture-usage.json)"}
   ],
   "remainingBlockers": [
-    "structured route ownership/auth classification inventory",
-    "structured architectural gate inventory",
-    "representative executable behavior/parity fixtures consuming authorization vectors"
+    "vg01-freeze run to freeze gates.json, routes.json, behaviour-fixtures.json and the cited test copies, then empty fixture-usage.json pendingArtifacts",
+    "request/response body fixtures: the pinned source holds no body examples and no recorded responses",
+    "a parity harness that executes the structured authorization vectors"
   ],
   "passRule": "VG-01 remains non-PASS until every required artifact is frozen with provenance/digest and is consumed by a deterministic check or parity test."
 }

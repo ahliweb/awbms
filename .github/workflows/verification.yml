@@ -91,6 +91,14 @@ jobs:
           grep -F '"count": 24' /tmp/vg01-a/modules.json
           grep -F '"count": 148' /tmp/vg01-a/migrations.json
           grep -F '"status": "partial-static-source-evidence"' /tmp/vg01-a/manifest.json
+          for artifact in gates routes behaviour-fixtures; do
+            test -s "/tmp/vg01-a/$artifact.json"
+          done
+
+      - name: Verify corpus checker unit tests
+        run: |
+          rustc --edition 2024 -D warnings --test tools/vg01_check_corpus.rs -o /tmp/vg01-check-test
+          /tmp/vg01-check-test
 
       - name: Verify frozen VG-01 evidence when present
         run: |
@@ -99,6 +107,25 @@ jobs:
           else
             echo "Frozen VG-01 corpus not committed yet; gate remains PARTIAL"
           fi
+
+      # The corpus checker must accept what the generator emits, otherwise the
+      # vg01-freeze workflow would fail only after a manual dispatch.
+      - name: Verify the generated structured inventories pass the corpus checker
+        run: |
+          if [[ -d contracts/legacy/awcms/frozen ]]; then
+            bash tools/vg01_check_generated.sh /tmp/vg01-a
+          else
+            echo "Frozen VG-01 corpus not committed yet; nothing to validate against"
+          fi
+
+      - name: Verify frozen migration SHA-256 against the pinned AWCMS SQL
+        run: |
+          if [[ -f contracts/legacy/awcms/frozen/static/migrations.json ]]; then
+            bash tools/vg01_verify_migrations.sh contracts/legacy/awcms/frozen/static/migrations.json .legacy/awcms
+          else
+            echo "Frozen migration list not committed yet; gate remains PARTIAL"
+          fi
+          bash tools/vg01_verify_migrations.sh /tmp/vg01-a/migrations.json .legacy/awcms
 
       - name: Upload deterministic VG-01 static evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
