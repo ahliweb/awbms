@@ -125,7 +125,7 @@ gated by `VG-04` — which is open. A proposal that challenges them on
 | "Use JWTs for user sessions" | Conflicts with `AD-11`. Revocation, step-up and membership changes must take effect immediately. JWT is fine for OIDC |
 | "Copy this code from AWCMS" | Conflicts with `AD-01` and `AD-24`. AWCMS is a requirements source; artifacts enter only as frozen fixtures under `contracts/legacy/awcms/` (`VG-15`) |
 | "Skip the parity test, behaviour is obviously the same" | `AD-26`. "Obviously the same" is the claim the harness exists to check |
-| "We benchmarked X and it is faster" | Check `VG-09` and `OD-04` — no acceptance thresholds exist yet, and correctness/security parity precedes performance (§23, §48) |
+| "We benchmarked X and it is faster" | Check `VG-09` and `OD-04` — acceptance is relative to an approved baseline only (Blueprint §11, ADR-0006; absolute SLOs open under `OD-06`), and correctness/security parity precedes performance (§23, §48) |
 
 ## Output format
 

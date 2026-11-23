@@ -48,6 +48,8 @@ project's own argument against maintaining the same statement in two places.
 | [0003](0003-executable-documentation-gate.md) | Documentation correctness is an executable gate | Accepted |
 | [0004](0004-adopt-product-development-flow-v2.md) | Adopt product development flow v2.0.0 | Accepted |
 | [0005](0005-licence-mit-and-dependency-licence-allow-list.md) | License AWBMS under MIT and enforce a dependency licence allow-list | Accepted |
+| [0006](0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09 | Accepted |
+| [0007](0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Keep the VG-01 legacy baseline pinned for Stage 1 | Accepted |
 
 ## Writing one
 

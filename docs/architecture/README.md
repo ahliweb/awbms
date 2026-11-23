@@ -32,8 +32,8 @@ than front to back.
    selection.
 3. **Appendix C — Decision register.** The authoritative form of §1, with
    rationale, consequence and gate per decision.
-4. **Appendix D — Open decisions.** What is *not* decided. Four of these block
-   Blueprint sign-off.
+4. **Appendix D — Open decisions.** What is *not* decided. Three still block
+   Blueprint sign-off (`OD-03`, `OD-05`, `OD-06`); closed entries link their ADR.
 5. **Appendix E — Verification gates.** What evidence would make any of this
    more than a proposal. Current status is in the Stage 1 gate register; no gate
    covering AWBMS behaviour (parity, performance, recovery) has passed.
