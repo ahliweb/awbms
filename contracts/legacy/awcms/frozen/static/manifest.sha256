@@ -1,7 +1,10 @@
 a6e678ef3c3e1d5c0df01b768da36e46fb0d36a41c44bf0d3b9fec01241ee345  ./astro-consumer.json
-a75140479503dcecbc3ee5cd08670b720ede889efe0f17188a90070cd3c7fc9e  ./manifest.json
+59bc0e4e47c694fa21a8ca0e3cb80aaaa82517f14364bab0de3707a270459f66  ./behaviour-fixtures.json
+11c5cdd52fb829048f08943069b8fc3511f3f88a9a1f9858433dd7b635ad7598  ./gates.json
+1d94eda70b8cb45e70bc17acfe5fd7969b543bfb5d0b023f825214de7388c82e  ./manifest.json
 1af7945eaea8e8b578eb25f4a2111da89052476b071f40765955662c49fba442  ./migrations.json
 a17bf87b9f44e0f941ea286b3bd29359a3d62e43b5d38f620f8a5d4bc9ed73f9  ./modules.json
+669dc9be9acbfc9f807680b73f58b993cf63723e03a77b79d1e18df95d861ce9  ./routes.json
 b191cb19c1a86e4889c4011eadc36c92788487f0e2b3cb688aeae822ca6ad0f1  ./source/awcms-api-consumer-contract.ts
 fd6455396b7fb04a32f29faa36fa38f86d2049321ebc0bf2178ca01706c04f4e  ./source/awcms-astro-contract.test.mjs
 178fb18df1385024e8553a01a92e3e5fac574d967aa273aaa19def25cfb0711e  ./source/awcms-astro-package.json
@@ -11,3 +14,8 @@ b661cbe711a38eb17c2db555c00a897779dbd96d1c36c2336604baed8548275a  ./source/awcms
 2c356b511640787e3643c0d012994d3ec202ba41f1af19417723d466fba8c365  ./source/awcms-package.json
 d72f3eb7298168274a9b8f037d905aa6261381751be7e9079935d7a5615676cf  ./source/awcms-public-api.openapi.yaml
 7e107aa455ea768eb101197cdb72d46d755de22f856e6537c9e030cbf5a64bd5  ./source/awcms-repo-inventory.md
+8c75dfed1e511fc9b8ec35823730735fa682af557eac43ef784e97bf8b05efea  ./source/tests/awcms/tests/analytics-beacon-cors.test.ts
+87b90aaa1a3a6b3f937414428318fd3dcefb6c62337875e0e146c1ee4392c227  ./source/tests/awcms/tests/identifier-masking.test.ts
+1efede07eb73ef591bdf46bdad824a74115d16bc4e6a401a5379b5bc413d088f  ./source/tests/awcms/tests/integration/module-tenant-lifecycle.integration.test.ts
+d79c50844cf1793161d90c982cc34d79a2f563a1b372472ebc7bd6ecfd928274  ./source/tests/awcms/tests/legacy-ad-write-path-retired.test.ts
+66226ba65ef9b88af7f361ba4ac41d82471f6a09ba85722d01d20ddf7f180757  ./source/tests/awcms/tests/newsletter-subscription.test.ts
