@@ -1,0 +1,23 @@
+# Code owners for AWBMS. Owner review is required for changes under these paths
+# (see the branch ruleset once enabled). Later entries override earlier ones.
+
+# Default owner for everything.
+*                               @ahliweb
+
+# High-risk paths: supply chain, CI, contracts, tooling, and security or
+# architecture documentation.
+/.github/workflows/             @ahliweb
+/contracts/                     @ahliweb
+/tools/                         @ahliweb
+/scripts/                       @ahliweb
+/docs/architecture/             @ahliweb
+/docs/security/                 @ahliweb
+/deny.toml                      @ahliweb
+/Cargo.toml                     @ahliweb
+/Cargo.lock                     @ahliweb
+/rust-toolchain.toml            @ahliweb
+/tests/fixtures/                @ahliweb
+
+# Future paths: listed now so ownership applies from the first commit that adds
+# them.
+/migrations/                    @ahliweb

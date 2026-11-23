@@ -42,6 +42,7 @@ trusted.
 | Document | Status |
 |---|---|
 | [Security documentation index](security/README.md) | Placeholder — see its own gap list |
+| [Security policy and vulnerability reporting](../SECURITY.md) | Current — pre-release, NOT PRODUCTION READY |
 
 ## How to read a document here
 
@@ -81,12 +82,11 @@ These are absences, recorded so that nobody mistakes them for oversights.
 | No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–3 and 5–8 | §49.2, `OD-06` |
 | No AWBMS application module — the workspace holds only `crates/verification` | Blueprint sign-off, §51 step 10 | `VG-02` |
 | No performance baseline for AWBMS or AWCMS | benchmark corpus, §23.1 | `VG-09`, `OD-04` |
-| No licence file, and no dependency licence allow-list | an ownership decision nobody has recorded | `OD-08` |
+| No dependency licence allow-list (AWBMS itself is MIT-licensed, see [`LICENSE`](../LICENSE)) | policy to be derived for `cargo-deny` | `OD-08` |
 | No approver named on the architecture validation | an owner accepting the conditional approval | Appendix F |
 
-The licence gap is worth stating plainly: this repository currently carries no
-licence, which means default copyright applies and no third party has any right
-to use it. That is a decision to make, not a file to forget.
+AWBMS's own licence is decided: MIT, per [`LICENSE`](../LICENSE). What remains
+open is the dependency licence allow-list, which is a prerequisite for `cargo-deny`.
 
 ## Documents that do not exist yet
 
