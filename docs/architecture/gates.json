@@ -12,7 +12,10 @@
         "docs/architecture/evidence/VG-01-executable-coverage-2026-11-23.md",
         "docs/architecture/evidence/VG-01-baseline-delta-2026-11-23.md"
       ],
-      "check": "tools/vg01_verify_frozen.sh",
+      "check": {
+        "kind": "script",
+        "path": "tools/vg01_verify_frozen.sh"
+      },
       "established": null
     },
     {
