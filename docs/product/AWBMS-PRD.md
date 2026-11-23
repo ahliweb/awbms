@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Draft — awaiting owner confirmation of values marked (owner)** |
+| Status | **Accepted 2026-11-23** — every `PD-` value accepted by the owner ([ADR-0009](../adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md)); lifecycle step 2 closed |
 | Date | 2026-11-23 |
 | Lifecycle stage | Stage 2 — User Research + PRD (lifecycle v2, step 2; [ADR-0004](../adr/0004-adopt-product-development-flow-v2.md)) |
 | Master Blueprint | [AWBMS Master Blueprint](../architecture/AWBMS-MASTER-BLUEPRINT.md) (Stage 1, signed off) |
@@ -25,7 +25,7 @@
 10. [Metrics and instrumentation plan](#10-metrics-and-instrumentation-plan)
 11. [Won't have](#11-wont-have)
 12. [Traceability](#12-traceability)
-13. [Owner decisions required](#13-owner-decisions-required)
+13. [Owner decisions](#13-owner-decisions)
 
 ## 0. How to read this document
 
@@ -35,10 +35,10 @@ Claim labels are those of [validation §0.2](../architecture/AWBMS-RUST-ARCHITEC
 - **[F]** is used only for a fact checked against a frozen artifact in this repository.
 - **[A]** marks an assumption. Every capacity figure in [§8](#8-capacity-assumptions) is **[A]**: no AWBMS workload has been measured.
 - **[R]** marks a requirement or value this PRD proposes.
-- **[O]** marks an open question. Each one is collected in [§13](#13-owner-decisions-required) as a `PD-` row.
+- **[O]** marks an open question. Each one is collected in [§13](#13-owner-decisions) as a `PD-` row.
 - **[G]** cites a verification gate. A gate reference is not a passed gate.
 
-A value written **(owner)** is a proposal that the owner has not yet confirmed. It is **not** a decision, and nothing may be built on it until its `PD-` row is closed. Values taken from [ADR-0008](../adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) are initial decisions (`OD-06`), not measurements; they came from internal traffic-readiness research (DL-049).
+A value written **(owner)** was proposed in the draft and is now an owner decision: every `PD-` row was accepted as written on 2026-11-23 ([ADR-0009](../adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md)). The label is kept so that each owner-set value stays traceable to its `PD-` row. Values taken from [ADR-0008](../adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) are initial decisions (`OD-06`), not measurements; they came from internal traffic-readiness research (DL-049).
 
 Requirement rules applied to every `REQ-` row: one sentence, "The system SHALL …"; says what, not how; testable; traceable to existing register IDs. Priority uses MoSCoW. A threshold with no decision behind it is marked (owner).
 
@@ -513,9 +513,9 @@ Each `REQ-` row is the anchor that later steps reference. Steps 3 to 11 add deri
 
 Every `Must` requirement must reach at least one `TST-` before gate 9; a requirement with no test is a Definition-of-Ready defect. Business goal to capability to acceptance criteria is the chain of [Blueprint WP-4](../architecture/AWBMS-MASTER-BLUEPRINT.md#29-immediate-stage-1-work-packages).
 
-## 13. Owner decisions required
+## 13. Owner decisions
 
-Every (owner) value in this document is collected here. **Open questions [O]**: each row is a question for the repository owner with a proposed value; none is decided. "Blocks" names the later step that cannot be finished without it.
+Every (owner) value in this document is collected here. **All rows accepted as proposed on 2026-11-23** ([ADR-0009](../adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md)); the "Proposed value" column is the decided value. `PD-11` and `PD-12` remain subject to legal review, and `PD-16` assigns `OD-07` an owner without closing it. "Blocks" names the later step that cannot be finished without it.
 
 | ID | Question | Proposed value | Rationale | Blocks |
 |---|---|---|---|---|

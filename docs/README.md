@@ -19,8 +19,8 @@ trusted.
 
 | Document | Status | Purpose |
 |---|---|---|
-| [AWBMS Stage 2 PRD](product/AWBMS-PRD.md) | Draft — owner decisions `PD-01`…`PD-22` pending | Capabilities, `REQ-` requirements with MoSCoW and acceptance scenarios, service tiers, SLO, RTO/RPO, capacity, migration success criteria |
-| [AWBMS user research](product/AWBMS-USER-RESEARCH.md) | Draft — desk research, no interviews | Personas `P-01`…`P-08`, jobs-to-be-done, usage evidence, untested assumptions `UA-` and validation plan |
+| [AWBMS Stage 2 PRD](product/AWBMS-PRD.md) | Accepted 2026-11-23 (ADR-0009) | Capabilities, `REQ-` requirements with MoSCoW and acceptance scenarios, service tiers, SLO, RTO/RPO, capacity, migration success criteria |
+| [AWBMS user research](product/AWBMS-USER-RESEARCH.md) | Accepted input — desk research, no interviews | Personas `P-01`…`P-08`, jobs-to-be-done, usage evidence, untested assumptions `UA-` and validation plan |
 
 
 ### Research (non-binding)
@@ -49,6 +49,7 @@ trusted.
 | [ADR-0006 — Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09](adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accepted |
 | [ADR-0007 — Keep the VG-01 legacy baseline pinned for Stage 1](adr/0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Accepted |
 | [ADR-0008 — Close OD-03, OD-05 and OD-06, resolve the assumption register, and sign off Stage 1](adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) | Accepted |
+| [ADR-0009 — Accept the Stage 2 PRD and its owner decisions PD-01 to PD-22](adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md) | Accepted |
 | [ADR template](adr/TEMPLATE.md) | — |
 
 ### Versioning

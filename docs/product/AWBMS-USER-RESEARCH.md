@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft — research input for Stage 2 PRD |
+| Status | Accepted as the Stage 2 research input with the PRD ([ADR-0009](../adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md)); its `UA-` assumptions remain untested |
 | Date | 2026-11-23 |
 | Method | desk research of existing usage artifacts; no interviews conducted |
 | Lifecycle step | Stage 2, step 2 "User Research + PRD" (tracking issue [#61](https://github.com/ahliweb/awbms/issues/61)) |
