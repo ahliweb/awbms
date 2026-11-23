@@ -1,0 +1,80 @@
+name: VG-01 baseline delta
+
+# Weekly, read-only report of how far the observed upstream AWCMS / AWCMS-Astro
+# heads have moved from the frozen VG-01 baseline (contracts/legacy/awcms/frozen).
+# It classifies the movement; contract, schema, security or consumer-surface
+# changes raise a warning on schedule and fail a manual run. It never refreshes the baseline:
+# a refresh needs an explicit decision, provenance update, regenerated hashes,
+# parity review and affected-test execution.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      awcms_head:
+        description: "Observed AWCMS ref or SHA (default: main)"
+        required: false
+        default: main
+      astro_head:
+        description: "Observed AWCMS-Astro ref or SHA (default: main)"
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AWCMS_HEAD: ${{ inputs.awcms_head || 'main' }}
+      ASTRO_HEAD: ${{ inputs.astro_head || 'main' }}
+    steps:
+      - name: Checkout AWBMS without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Compute baseline delta
+        # Exit codes: 0 none/docs-only, 1 tool error, 2 alert (contract/schema/
+        # security/consumer), 3 review (behaviour/unclassified). A scheduled run
+        # only warns on 2/3, so a known, undecided delta does not leave the job
+        # permanently red; a manual run fails on them. Tool errors always fail.
+        run: |
+          set +e
+          bash tools/vg01_baseline_delta.sh \
+            --out "$RUNNER_TEMP/vg01-baseline-delta" \
+            --awcms-head "$AWCMS_HEAD" \
+            --astro-head "$ASTRO_HEAD"
+          rc=$?
+          set -e
+          case "$rc" in
+            0) exit 0 ;;
+            2|3)
+              echo "::warning title=VG-01 baseline delta::upstream moved in a reviewed class (exit $rc); see the job summary. The frozen baseline was not refreshed."
+              if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then exit 0; fi
+              exit "$rc" ;;
+            *) exit "$rc" ;;
+          esac
+
+      - name: Publish report to the job summary
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/vg01-baseline-delta/baseline-delta.md" ]]; then
+            cat "$RUNNER_TEMP/vg01-baseline-delta/baseline-delta.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vg01-baseline-delta
+          path: ${{ runner.temp }}/vg01-baseline-delta/
+          if-no-files-found: ignore
+          retention-days: 90

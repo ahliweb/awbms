@@ -1,0 +1,119 @@
+# VG-01 baseline-delta classification rules.
+#
+# Format: <repo> <glob> <class>   (whitespace separated, one rule per line)
+#   repo   awcms | awcms-astro | *   (short name of the upstream repository)
+#   glob   bash `case` pattern matched against the repo-relative path;
+#          `*` also matches `/`, so `sql/*` covers the whole tree.
+#   class  one of the ids below.
+# The FIRST matching rule wins. Anything that matches no rule is `unclassified`.
+# Order therefore goes from most to least security-relevant.
+#
+# Classes (alert = exit 2, review = exit 3, quiet = exit 0):
+#   api-contract            alert   API / OpenAPI / AsyncAPI contract surface
+#   migration-schema        alert   migration / schema / RLS / role
+#   authorization-security  alert   authorization and security invariants
+#   astro-consumer          alert   AWCMS-Astro consumer surface
+#   behaviour-parity        review  behaviour / parity-fixture changes
+#   ci-docs                 quiet   CI / tooling / docs only
+#   unclassified            review  matches nothing; a human must classify it
+#
+# Derived from what the frozen corpus pins (contracts/legacy/awcms/frozen/static):
+#   AWCMS:  src/modules/index.ts, openapi/awcms-public-api.openapi.yaml,
+#           asyncapi/awcms-domain-events.asyncapi.yaml, scripts/api-consumer-contract.ts,
+#           sql/*.sql (148 migrations), docs/awcms/repo-inventory.md, package.json,
+#           .github/workflows/ci.yml
+#   Astro:  tests/kontrak-awcms.test.mjs, package.json, and the consumed/committed
+#           /api/v1 paths (astro-consumer.json)
+# Live RLS/role/grant evidence is derived from sql/*.sql, hence migration-schema.
+
+# --- AWCMS: API / contract surface -------------------------------------------
+awcms  openapi/*                                   api-contract
+awcms  asyncapi/*                                  api-contract
+awcms  scripts/api-consumer-contract.ts            api-contract
+awcms  scripts/api-spec-check.ts                   api-contract
+awcms  awcms-family-compatibility.*                api-contract
+awcms  src/modules/index.ts                        api-contract
+awcms  src/pages/api/*                             api-contract
+
+# --- AWCMS: migration / schema / RLS / role ----------------------------------
+awcms  sql/*                                       migration-schema
+awcms  scripts/db-migrate.ts                       migration-schema
+awcms  scripts/db-*                                migration-schema
+awcms  src/lib/database/*                          migration-schema
+
+# --- AWCMS: authorization / security invariants ------------------------------
+awcms  src/lib/auth/*                              authorization-security
+awcms  src/lib/security/*                          authorization-security
+awcms  src/lib/tenant/*                            authorization-security
+awcms  src/lib/http/*                              authorization-security
+awcms  src/lib/edge-cache/*                        authorization-security
+awcms  src/modules/identity-access/*               authorization-security
+awcms  src/modules/tenant-admin/*                  authorization-security
+awcms  src/modules/tenant-domain/*                 authorization-security
+awcms  src/middleware*                             authorization-security
+awcms  scripts/access-*                            authorization-security
+awcms  fixtures/abac-*                             authorization-security
+awcms  tests/abac-*                                authorization-security
+awcms  tests/access-*                              authorization-security
+awcms  tests/*-deny-*                              authorization-security
+awcms  tests/*rls*                                 authorization-security
+awcms  tests/*tenant-isolation*                    authorization-security
+awcms  tests/*security*                            authorization-security
+
+# --- AWCMS: CI / tooling / docs only (before the behaviour catch-alls) -------
+awcms  .github/*                                   ci-docs
+awcms  .changeset/*                                ci-docs
+awcms  .claude/*                                   ci-docs
+awcms  graphify-out/*                              ci-docs
+awcms  docs/*                                      ci-docs
+awcms  *.md                                        ci-docs
+awcms  LICENSE                                     ci-docs
+awcms  .editorconfig                               ci-docs
+awcms  .gitignore                                  ci-docs
+awcms  .gitattributes                              ci-docs
+awcms  .dockerignore                               ci-docs
+awcms  .graphifyignore                             ci-docs
+awcms  .prettier*                                  ci-docs
+awcms  ops/*                                       ci-docs
+awcms  deploy/*                                    ci-docs
+awcms  infra/*                                     ci-docs
+awcms  scripts/*                                   ci-docs
+
+# --- AWCMS: behaviour / parity fixtures --------------------------------------
+awcms  src/modules/*                               behaviour-parity
+awcms  src/pages/*                                 behaviour-parity
+awcms  src/lib/*                                   behaviour-parity
+awcms  tests/*                                     behaviour-parity
+awcms  fixtures/*                                  behaviour-parity
+
+# --- AWCMS-Astro: consumer surface -------------------------------------------
+awcms-astro  src/lib/awcms/*                       astro-consumer
+awcms-astro  src/config/*                          astro-consumer
+awcms-astro  src/pages/api/*                       astro-consumer
+awcms-astro  server/*                              astro-consumer
+awcms-astro  tests/kontrak-awcms*                  astro-consumer
+awcms-astro  package.json                          astro-consumer
+awcms-astro  bun.lock                              astro-consumer
+awcms-astro  astro.config.mjs                      astro-consumer
+awcms-astro  .env.example                          astro-consumer
+
+# --- AWCMS-Astro: CI / tooling / docs only -----------------------------------
+awcms-astro  .github/*                             ci-docs
+awcms-astro  .changesets/*                         ci-docs
+awcms-astro  .claude/*                             ci-docs
+awcms-astro  graphify-out/*                        ci-docs
+awcms-astro  docs/*                                ci-docs
+awcms-astro  *.md                                  ci-docs
+awcms-astro  LICENSE                               ci-docs
+awcms-astro  sbom.cdx.json                         ci-docs
+awcms-astro  lighthouserc.json                     ci-docs
+awcms-astro  scripts/*                             ci-docs
+awcms-astro  .editorconfig                         ci-docs
+awcms-astro  .gitignore                            ci-docs
+awcms-astro  .gitattributes                        ci-docs
+awcms-astro  .dockerignore                         ci-docs
+awcms-astro  .graphifyignore                       ci-docs
+awcms-astro  Dockerfile                            ci-docs
+
+# --- AWCMS-Astro: behaviour / parity ------------------------------------------
+awcms-astro  tests/*                               behaviour-parity
