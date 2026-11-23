@@ -1,0 +1,2969 @@
+{
+  "source_sha": "11f2e95a47b1328a820f976d60f978c38a067903",
+  "method": "every non-comment call of checkSharedRateLimit / checkAuthRateLimit / checkRateLimit under src/ is parsed (arguments, key template, threshold and window expressions, resolved through their declarations); calls routed through a wrapper function are expanded at the wrapper's callers; each fact cites path, line and an anchor on that line, and the cited files are frozen under source/awcms-impl/. Threshold defaults are the values in source, not the values in any .env file.",
+  "limiter": [
+    {
+      "id": "algorithm",
+      "statement": "fixed-window counter: the first hit opens a window, later hits in it increment, and the request is refused once the count exceeds maxAttempts",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 181, "anchor": "now - existing.windowStart >= config.windowMs"},
+        {"path": "src/lib/security/rate-limit.ts", "line": 192, "anchor": "existing.count > config.maxAttempts"}
+      ]
+    },
+    {
+      "id": "in-process-backend",
+      "statement": "checkRateLimit counts in a per-process Map keyed by the bucket key",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 65, "anchor": "const buckets = new Map<string, Bucket>();"}
+      ]
+    },
+    {
+      "id": "redis-backend",
+      "statement": "checkSharedRateLimit counts in Redis (INCR, PEXPIRE on first use) when a Redis client is configured; the window index is part of the Redis key",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 354, "anchor": "client.send(\"INCR\", [redisKey])"},
+        {"path": "src/lib/security/rate-limit.ts", "line": 364, "anchor": "client.send(\"PEXPIRE\", ["},
+        {"path": "src/lib/security/rate-limit.ts", "line": 348, "anchor": "const window = Math.floor(now / config.windowMs);"},
+        {"path": "src/lib/security/rate-limit.ts", "line": 402, "anchor": "namespace: \"rate-limit\""}
+      ]
+    },
+    {
+      "id": "no-redis-fallback",
+      "statement": "without Redis, checkSharedRateLimit delegates to the in-process checkRateLimit",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 342, "anchor": "return checkRateLimit(key, config, now);"}
+      ]
+    },
+    {
+      "id": "redis-failure-is-fail-open",
+      "statement": "when Redis is configured but a command fails, the shared limiter allows the request",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 387, "anchor": "// Fail OPEN."},
+        {"path": "src/lib/security/rate-limit.ts", "line": 390, "anchor": "return { allowed: true };"}
+      ]
+    },
+    {
+      "id": "redis-command-timeout-ms",
+      "statement": "per-command Redis timeout",
+      "value": 250,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 398, "anchor": "const RATE_LIMIT_COMMAND_TIMEOUT_MS"}
+      ]
+    },
+    {
+      "id": "in-process-bucket-cap",
+      "statement": "hard cap on live in-process buckets; soonest-to-expire buckets are evicted beyond it",
+      "value": 50000,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 94, "anchor": "const BUCKET_HARD_CAP"}
+      ]
+    },
+    {
+      "id": "in-process-sweep-interval-ms",
+      "statement": "interval between sweeps of elapsed buckets",
+      "value": 60000,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 93, "anchor": "const BUCKET_SWEEP_INTERVAL_MS"}
+      ]
+    },
+    {
+      "id": "retry-after",
+      "statement": "a refusal carries retryAfterSec = ceil(remaining window / 1000), minimum 1",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 196, "anchor": "retryAfterSec: Math.max(1, Math.ceil(remainingMs / 1000))"}
+      ]
+    },
+    {
+      "id": "client-ip-trust",
+      "statement": "X-Forwarded-For is honoured only when TRUSTED_PROXY_ENABLED is exactly \"true\"; otherwise the socket address is the client",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 263, "anchor": "process.env.TRUSTED_PROXY_ENABLED === \"true\""},
+        {"path": "src/lib/security/rate-limit.ts", "line": 315, "anchor": "return clientAddress ?? \"unknown\";"}
+      ]
+    },
+    {
+      "id": "client-ip-hop-count",
+      "statement": "with trust enabled the client is the X-Forwarded-For entry TRUSTED_PROXY_HOP_COUNT positions from the right (default shown)",
+      "value": 1,
+      "facts": [
+        {"path": "src/lib/security/rate-limit.ts", "line": 270, "anchor": "process.env.TRUSTED_PROXY_HOP_COUNT"},
+        {"path": "src/lib/security/rate-limit.ts", "line": 267, "anchor": "const DEFAULT_TRUSTED_PROXY_HOP_COUNT"},
+        {"path": "src/lib/security/rate-limit.ts", "line": 298, "anchor": "parts[parts.length - hopCount]"}
+      ]
+    },
+    {
+      "id": "threshold-parser-parsePositiveIntSetting",
+      "statement": "parsePositiveIntSetting rejects non-finite, non-integer and non-positive values and returns the default",
+      "value": null,
+      "facts": [
+        {"path": "src/lib/security/env-thresholds.ts", "line": 87, "anchor": "export function parsePositiveIntSetting("},
+        {"path": "src/lib/security/env-thresholds.ts", "line": 98, "anchor": "!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0"}
+      ]
+    }
+  ],
+  "auth_limiter": {
+    "function": "checkAuthRateLimit",
+    "module": "src/lib/security/auth-rate-limit.ts",
+    "statement": "checks the shared per-source bucket first, then the per-route bucket keyed by client IP, the caller-supplied tenant id and the scope; the first refusal is returned",
+    "source_bucket": {
+      "name": "source",
+      "key_template": "auth-source:${clientIp}",
+      "shared_across_routes": true,
+      "checked_first": true,
+      "dimensions": [
+        {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+      ],
+      "max": {
+        "source": "env",
+        "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+        "default": 60,
+        "unit": "requests",
+        "parsing": "parseCeiling",
+        "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+        "invalid_value_fallback": 60,
+        "declared_at": [
+          {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+          {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+        ]
+      },
+      "window": {
+        "source": "env",
+        "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+        "default": 60,
+        "unit": "seconds",
+        "parsing": "parseCeiling",
+        "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+        "invalid_value_fallback": 60,
+        "declared_at": [
+          {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+          {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+        ]
+      },
+      "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+    },
+    "facts": [
+      {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+    ],
+    "order": {"path": "src/lib/security/auth-rate-limit.ts", "line": 122, "anchor": "if (!source.allowed) {"}
+  },
+  "not_derivable_from_source": ["limits applied outside the AWCMS repository (reverse proxy, CDN, WAF) and whether REDIS_URL is configured in a deployment, which decides between the shared and the in-process counter", "the effective value of any setting in a deployment: the artifact records the defaults and parsers in source, never an .env value", "whether the Turnstile challenge is active in a deployment (it depends on full-online security mode and Turnstile being enabled)", "request-size limits (src/lib/security/request-body-limit.ts) are size limits, not rate limits, and are not inventoried here"],
+  "summary": {
+    "limiter_call_lines": 38,
+    "call_sites": 40,
+    "buckets": 53,
+    "distinct_route_method_pairs": 38,
+    "endpoint_classes": 39,
+    "tenant_keyed_sites": 13,
+    "sites_with_recipient_dimension": 0,
+    "parsing_occurrences": {"Number-coercion-guarded": 5, "Number-coercion-unguarded": 4, "Number-env-guarded-in-function": 2, "literal": 15, "parsePositiveIntEnv": 5, "parsePositiveIntSetting": 9},
+    "sites_with_unvalidated_number_coercion": ["RL-012 POST /api/v1/auth/password/forgot", "RL-013 POST /api/v1/auth/password/reset", "RL-016 POST /api/v1/auth/register", "RL-026 GET /api/v1/auth/sso/[providerKey]/start"]
+  },
+  "call_sites": [
+    {
+      "id": "RL-001",
+      "file": "src/modules/seo-distribution/presentation/redirect-middleware.ts",
+      "line": 170,
+      "limiter": "checkSharedRateLimit",
+      "surface": "module",
+      "route": null,
+      "method": null,
+      "call": {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 170, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "seo-not-found:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "SEO_NOT_FOUND_RATE_LIMIT_MAX",
+            "default": 120,
+            "unit": "requests",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 120,
+            "declared_at": [
+              {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 64, "anchor": "const NOT_FOUND_RATE_LIMIT_MAX"},
+              {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 65, "anchor": "process.env.SEO_NOT_FOUND_RATE_LIMIT_MAX"},
+              {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 174, "anchor": "Number.isFinite(NOT_FOUND_RATE_LIMIT_MAX)"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "SEO_NOT_FOUND_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 67, "anchor": "const NOT_FOUND_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 68, "anchor": "process.env.SEO_NOT_FOUND_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 179, "anchor": "Number.isFinite(NOT_FOUND_RATE_LIMIT_WINDOW_SEC)"}
+            ]
+          },
+          "source": {"path": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "line": 170, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-002",
+      "file": "src/pages/api/v1/analytics/collect.ts",
+      "line": 144,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/analytics/collect",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/analytics/collect.ts", "line": 144, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "analytics-collect:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_MAX",
+            "default": 120,
+            "unit": "requests",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 120,
+            "declared_at": [
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 60, "anchor": "const COLLECT_RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 61, "anchor": "process.env.VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 148, "anchor": "Number.isFinite(COLLECT_RATE_LIMIT_MAX)"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 63, "anchor": "const COLLECT_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 64, "anchor": "process.env.VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 152, "anchor": "Number.isFinite(COLLECT_RATE_LIMIT_WINDOW_SEC)"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/analytics/collect.ts", "line": 144, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-003",
+      "file": "src/pages/api/v1/analytics/collect.ts",
+      "line": 373,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/analytics/collect",
+      "method": "OPTIONS",
+      "call": {"path": "src/pages/api/v1/analytics/collect.ts", "line": 373, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "analytics-collect:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_MAX",
+            "default": 120,
+            "unit": "requests",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 120,
+            "declared_at": [
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 60, "anchor": "const COLLECT_RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 61, "anchor": "process.env.VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 148, "anchor": "Number.isFinite(COLLECT_RATE_LIMIT_MAX)"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 63, "anchor": "const COLLECT_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 64, "anchor": "process.env.VISITOR_ANALYTICS_COLLECT_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/analytics/collect.ts", "line": 152, "anchor": "Number.isFinite(COLLECT_RATE_LIMIT_WINDOW_SEC)"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/analytics/collect.ts", "line": 373, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-004",
+      "file": "src/pages/api/v1/auth/delegated-access/redeem.ts",
+      "line": 98,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/delegated-access/redeem",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/delegated-access/redeem.ts", "line": 98, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:delegated_access_redeem",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "inputs.tenantId", "origin": ["resolveAuthInputs(request, cookies)"]},
+            {"name": "scope", "expr": "\"delegated_access_redeem\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_MAX",
+            "default": 20,
+            "unit": "requests",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 111, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 112, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_MAX\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 84, "anchor": "const DEFAULT_RATE_LIMIT_MAX_ATTEMPTS"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 115, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 116, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 85, "anchor": "const DEFAULT_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/delegated-access/redeem.ts", "line": 98, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/delegated-access/redeem.ts", "line": 50, "anchor": "const RATE_LIMIT_KEY"},
+        {"path": "src/pages/api/v1/auth/delegated-access/redeem.ts", "line": 58, "anchor": "inputs"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-005",
+      "file": "src/pages/api/v1/auth/invitations/[token].ts",
+      "line": 63,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/invitations/[token]",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/auth/invitations/[token].ts", "line": 63, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:invitation-preview",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id"]},
+            {"name": "scope", "expr": "\"invitation-preview\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_INVITATION_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 5,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/invitations/[token].ts", "line": 62, "anchor": "const limits"},
+              {"path": "src/lib/auth/invitation-config.ts", "line": 56, "anchor": "Number(env.AUTH_INVITATION_RATE_LIMIT_MAX"},
+              {"path": "src/lib/auth/invitation-config.ts", "line": 61, "anchor": "maxAttempts > 0"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_INVITATION_RATE_LIMIT_WINDOW_SEC",
+            "default": 900,
+            "unit": "seconds",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 900,
+            "declared_at": [
+              {"path": "src/lib/auth/invitation-config.ts", "line": 57, "anchor": "Number(env.AUTH_INVITATION_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/auth/invitation-config.ts", "line": 63, "anchor": "windowSec > 0"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/invitations/[token].ts", "line": 63, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/invitations/[token].ts", "line": 47, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-006",
+      "file": "src/pages/api/v1/auth/invitations/[token]/accept.ts",
+      "line": 66,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/invitations/[token]/accept",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/invitations/[token]/accept.ts", "line": 66, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:invitation-accept",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id"]},
+            {"name": "scope", "expr": "\"invitation-accept\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_INVITATION_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 5,
+            "declared_at": [
+              {"path": "src/lib/auth/invitation-config.ts", "line": 56, "anchor": "Number(env.AUTH_INVITATION_RATE_LIMIT_MAX"},
+              {"path": "src/lib/auth/invitation-config.ts", "line": 61, "anchor": "maxAttempts > 0"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_INVITATION_RATE_LIMIT_WINDOW_SEC",
+            "default": 900,
+            "unit": "seconds",
+            "parsing": "Number-coercion-guarded",
+            "invalid_value": "a non-finite or non-positive result falls back to the stated fallback; an empty string coerces to 0 and therefore also falls back",
+            "invalid_value_fallback": 900,
+            "declared_at": [
+              {"path": "src/lib/auth/invitation-config.ts", "line": 57, "anchor": "Number(env.AUTH_INVITATION_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/auth/invitation-config.ts", "line": 63, "anchor": "windowSec > 0"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/invitations/[token]/accept.ts", "line": 66, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/invitations/[token]/accept.ts", "line": 55, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-007",
+      "file": "src/pages/api/v1/auth/login.ts",
+      "line": 296,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/login",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/login.ts", "line": 296, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:login-tenantless",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "TENANTLESS_RATE_LIMIT_KEY", "origin": ["constant \"tenantless\""]},
+            {"name": "scope", "expr": "\"login-tenantless\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_MAX",
+            "default": 20,
+            "unit": "requests",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 111, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 112, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_MAX\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 84, "anchor": "const DEFAULT_RATE_LIMIT_MAX_ATTEMPTS"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 115, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 116, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 85, "anchor": "const DEFAULT_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/login.ts", "line": 296, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/login.ts", "line": 90, "anchor": "const TENANTLESS_RATE_LIMIT_KEY"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-008",
+      "file": "src/pages/api/v1/auth/login.ts",
+      "line": 467,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/login",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/login.ts", "line": 467, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:login",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id"]},
+            {"name": "scope", "expr": "\"login\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_MAX",
+            "default": 20,
+            "unit": "requests",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 111, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 112, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_MAX\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 84, "anchor": "const DEFAULT_RATE_LIMIT_MAX_ATTEMPTS"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 115, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 116, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 85, "anchor": "const DEFAULT_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/login.ts", "line": 467, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/login.ts", "line": 452, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-009",
+      "file": "src/pages/api/v1/auth/mfa/step-up.ts",
+      "line": 53,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/mfa/step-up",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/mfa/step-up.ts", "line": 53, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:mfa-stepup",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["resolveAuthInputs(request, cookies)"]},
+            {"name": "scope", "expr": "\"mfa-stepup\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_MFA_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-env-guarded-in-function",
+            "invalid_value": "an absent, non-numeric or non-positive value falls back to the default",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/lib/auth/mfa-config.ts", "line": 121, "anchor": "export function resolveMfaRateLimitMax"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 124, "anchor": "Number(env.AUTH_MFA_RATE_LIMIT_MAX)"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 22, "anchor": "const DEFAULT_MFA_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_MFA_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "Number-env-guarded-in-function",
+            "invalid_value": "an absent, non-numeric or non-positive value falls back to the default",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/lib/auth/mfa-config.ts", "line": 129, "anchor": "export function resolveMfaRateLimitWindowSec"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 132, "anchor": "Number(env.AUTH_MFA_RATE_LIMIT_WINDOW_SEC)"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 23, "anchor": "const DEFAULT_MFA_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/mfa/step-up.ts", "line": 53, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/mfa/step-up.ts", "line": 46, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-010",
+      "file": "src/pages/api/v1/auth/mfa/totp/verify.ts",
+      "line": 63,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/mfa/totp/verify",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/mfa/totp/verify.ts", "line": 63, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:mfa-verify",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id", "tenant cookie"]},
+            {"name": "scope", "expr": "\"mfa-verify\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_MFA_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-env-guarded-in-function",
+            "invalid_value": "an absent, non-numeric or non-positive value falls back to the default",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/lib/auth/mfa-config.ts", "line": 121, "anchor": "export function resolveMfaRateLimitMax"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 124, "anchor": "Number(env.AUTH_MFA_RATE_LIMIT_MAX)"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 22, "anchor": "const DEFAULT_MFA_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_MFA_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "Number-env-guarded-in-function",
+            "invalid_value": "an absent, non-numeric or non-positive value falls back to the default",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/lib/auth/mfa-config.ts", "line": 129, "anchor": "export function resolveMfaRateLimitWindowSec"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 132, "anchor": "Number(env.AUTH_MFA_RATE_LIMIT_WINDOW_SEC)"},
+              {"path": "src/lib/auth/mfa-config.ts", "line": 23, "anchor": "const DEFAULT_MFA_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/mfa/totp/verify.ts", "line": 63, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/mfa/totp/verify.ts", "line": 52, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-011",
+      "file": "src/pages/api/v1/auth/password/change.ts",
+      "line": 91,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/password/change",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/password/change.ts", "line": 91, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "auth-password-change:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 5,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/password/change.ts", "line": 59, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/password/change.ts", "line": 59, "anchor": "maxAttempts: 5"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 900,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/password/change.ts", "line": 59, "anchor": "windowMs: 900_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/password/change.ts", "line": 91, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-012",
+      "file": "src/pages/api/v1/auth/password/forgot.ts",
+      "line": 73,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/password/forgot",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 73, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:password-forgot",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id"]},
+            {"name": "scope", "expr": "\"password-forgot\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_PASSWORD_RESET_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 30, "anchor": "const RATE_LIMIT_MAX_ATTEMPTS"},
+              {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 31, "anchor": "process.env.AUTH_PASSWORD_RESET_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_PASSWORD_RESET_RATE_LIMIT_WINDOW_SEC",
+            "default": 900,
+            "unit": "seconds",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 33, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 34, "anchor": "process.env.AUTH_PASSWORD_RESET_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 73, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 63, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-013",
+      "file": "src/pages/api/v1/auth/password/reset.ts",
+      "line": 61,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/password/reset",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 61, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:password-reset",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id"]},
+            {"name": "scope", "expr": "\"password-reset\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_PASSWORD_RESET_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 24, "anchor": "const RATE_LIMIT_MAX_ATTEMPTS"},
+              {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 25, "anchor": "process.env.AUTH_PASSWORD_RESET_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_PASSWORD_RESET_RATE_LIMIT_WINDOW_SEC",
+            "default": 900,
+            "unit": "seconds",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 27, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 28, "anchor": "process.env.AUTH_PASSWORD_RESET_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 61, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 52, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-014",
+      "file": "src/pages/api/v1/auth/preferences.ts",
+      "line": 314,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/preferences",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/preferences.ts", "line": 314, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "auth-preferences:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/preferences.ts", "line": 71, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/preferences.ts", "line": 71, "anchor": "maxAttempts: 60"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/preferences.ts", "line": 71, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/preferences.ts", "line": 314, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-015",
+      "file": "src/pages/api/v1/auth/profile.ts",
+      "line": 152,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/profile",
+      "method": "PATCH",
+      "call": {"path": "src/pages/api/v1/auth/profile.ts", "line": 152, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "auth-profile:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 30,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/profile.ts", "line": 54, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/profile.ts", "line": 54, "anchor": "maxAttempts: 30"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/profile.ts", "line": 54, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/profile.ts", "line": 152, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-016",
+      "file": "src/pages/api/v1/auth/register.ts",
+      "line": 72,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/register",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/register.ts", "line": 72, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:register",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id"]},
+            {"name": "scope", "expr": "\"register\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SELF_REGISTRATION_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/register.ts", "line": 25, "anchor": "const RATE_LIMIT_MAX_ATTEMPTS"},
+              {"path": "src/pages/api/v1/auth/register.ts", "line": 26, "anchor": "process.env.AUTH_SELF_REGISTRATION_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SELF_REGISTRATION_RATE_LIMIT_WINDOW_SEC",
+            "default": 900,
+            "unit": "seconds",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/register.ts", "line": 28, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/auth/register.ts", "line": 29, "anchor": "process.env.AUTH_SELF_REGISTRATION_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/register.ts", "line": 72, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/register.ts", "line": 63, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-017",
+      "file": "src/pages/api/v1/auth/session-handoff/issue.ts",
+      "line": 60,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/session-handoff/issue",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/session-handoff/issue.ts", "line": 60, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "handoff-issue:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 30,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/session-handoff/issue.ts", "line": 62, "anchor": "maxAttempts: 30"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/session-handoff/issue.ts", "line": 62, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/session-handoff/issue.ts", "line": 60, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-018",
+      "file": "src/pages/api/v1/auth/session-handoff/redeem.ts",
+      "line": 58,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/session-handoff/redeem",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/session-handoff/redeem.ts", "line": 58, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "handoff-redeem:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 20,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/session-handoff/redeem.ts", "line": 60, "anchor": "maxAttempts: 20"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/session-handoff/redeem.ts", "line": 60, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/session-handoff/redeem.ts", "line": 58, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-019",
+      "file": "src/pages/api/v1/auth/session.ts",
+      "line": 70,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/session",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/auth/session.ts", "line": 70, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "session-introspect:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/session.ts", "line": 38, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/session.ts", "line": 38, "anchor": "maxAttempts: 60"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/session.ts", "line": 38, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/session.ts", "line": 70, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-020",
+      "file": "src/pages/api/v1/auth/session/switch.ts",
+      "line": 112,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/session/switch",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/session/switch.ts", "line": 112, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:session-switch",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "targetTenantId", "origin": ["request body tenantId"]},
+            {"name": "scope", "expr": "\"session-switch\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_MAX",
+            "default": 20,
+            "unit": "requests",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 111, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 112, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_MAX\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 84, "anchor": "const DEFAULT_RATE_LIMIT_MAX_ATTEMPTS"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 115, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 116, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 85, "anchor": "const DEFAULT_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/session/switch.ts", "line": 112, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/session/switch.ts", "line": 99, "anchor": "targetTenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-021",
+      "file": "src/pages/api/v1/auth/session/tenant.ts",
+      "line": 107,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/session/tenant",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/session/tenant.ts", "line": 107, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:session-tenant",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request body tenantId"]},
+            {"name": "scope", "expr": "\"session-tenant\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_MAX",
+            "default": 20,
+            "unit": "requests",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 111, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 112, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_MAX\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 84, "anchor": "const DEFAULT_RATE_LIMIT_MAX_ATTEMPTS"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntEnv",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 115, "anchor": "parsePositiveIntEnv("},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 116, "anchor": "\"AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC\""},
+              {"path": "src/modules/identity-access/application/login-policy.ts", "line": 85, "anchor": "const DEFAULT_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/session/tenant.ts", "line": 107, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/session/tenant.ts", "line": 102, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-022",
+      "file": "src/pages/api/v1/auth/sessions/[id].ts",
+      "line": 72,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/sessions/[id]",
+      "method": "DELETE",
+      "call": {"path": "src/pages/api/v1/auth/sessions/[id].ts", "line": 72, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "auth-session-revoke:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 30,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sessions/[id].ts", "line": 38, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/sessions/[id].ts", "line": 38, "anchor": "maxAttempts: 30"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sessions/[id].ts", "line": 38, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/sessions/[id].ts", "line": 72, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-023",
+      "file": "src/pages/api/v1/auth/sessions/index.ts",
+      "line": 80,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/sessions",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/auth/sessions/index.ts", "line": 80, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "auth-sessions-list:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sessions/index.ts", "line": 43, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/sessions/index.ts", "line": 43, "anchor": "maxAttempts: 60"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sessions/index.ts", "line": 43, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/sessions/index.ts", "line": 80, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-024",
+      "file": "src/pages/api/v1/auth/sessions/revoke-all.ts",
+      "line": 80,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/sessions/revoke-all",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/auth/sessions/revoke-all.ts", "line": 80, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "auth-sessions-revoke-all:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 10,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sessions/revoke-all.ts", "line": 44, "anchor": "const RATE_LIMIT"},
+              {"path": "src/pages/api/v1/auth/sessions/revoke-all.ts", "line": 44, "anchor": "maxAttempts: 10"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sessions/revoke-all.ts", "line": 44, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/sessions/revoke-all.ts", "line": 80, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-025",
+      "file": "src/pages/api/v1/auth/sso/[providerKey]/callback.ts",
+      "line": 83,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/sso/[providerKey]/callback",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/auth/sso/[providerKey]/callback.ts", "line": 83, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "sso-callback:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 30,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sso/[providerKey]/callback.ts", "line": 85, "anchor": "maxAttempts: 30"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sso/[providerKey]/callback.ts", "line": 85, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/sso/[providerKey]/callback.ts", "line": 83, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-026",
+      "file": "src/pages/api/v1/auth/sso/[providerKey]/start.ts",
+      "line": 76,
+      "limiter": "checkAuthRateLimit",
+      "surface": "route",
+      "route": "/api/v1/auth/sso/[providerKey]/start",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 76, "anchor": "checkAuthRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "source",
+          "key_template": "auth-source:${clientIp}",
+          "shared_across_routes": true,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "input.clientIp", "origin": []}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 111, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_MAX"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 53, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parseCeiling",
+            "invalid_value": "an absent or blank value uses the default; the value is read with parseInt and anything that is not an integer of at least 1 falls back to the default",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 116, "anchor": "process.env.AUTH_SOURCE_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/lib/security/auth-rate-limit.ts", "line": 54, "anchor": "const DEFAULT_SOURCE_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/lib/security/auth-rate-limit.ts", "line": 107, "anchor": "checkSharedRateLimit("}
+        },
+        {
+          "name": "scope",
+          "key_template": "${clientIp}:${tenantId}:sso-start",
+          "shared_across_routes": false,
+          "checked_first": false,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]},
+            {"name": "tenant", "expr": "tenantId", "origin": ["request header x-awcms-tenant-id", "tenant cookie", "query parameter tenantId"]},
+            {"name": "scope", "expr": "\"sso-start\"", "origin": ["literal in source"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_MAX",
+            "default": 20,
+            "unit": "requests",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 20, "anchor": "const RATE_LIMIT_MAX_ATTEMPTS"},
+              {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 21, "anchor": "process.env.AUTH_LOGIN_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "Number-coercion-unguarded",
+            "invalid_value": "no validation: Number() is used as given, so a non-numeric value yields NaN and an empty string yields 0",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 23, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 24, "anchor": "process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 76, "anchor": "checkAuthRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "line": 65, "anchor": "tenantId"},
+        {"path": "src/lib/security/auth-rate-limit.ts", "line": 61, "anchor": "const SOURCE_BUCKET_PREFIX"}
+      ]
+    },
+    {
+      "id": "RL-027",
+      "file": "src/pages/api/v1/comments/[id]/replies.ts",
+      "line": 46,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/comments/[id]/replies",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/comments/[id]/replies.ts", "line": 46, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "comments:reply:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 20,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/[id]/replies.ts", "line": 47, "anchor": "maxAttempts: 20"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 3600,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/[id]/replies.ts", "line": 48, "anchor": "windowMs: 60 * 60 * 1000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/comments/[id]/replies.ts", "line": 46, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-028",
+      "file": "src/pages/api/v1/comments/[id]/report.ts",
+      "line": 44,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/comments/[id]/report",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/comments/[id]/report.ts", "line": 44, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "comments:report:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 30,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/[id]/report.ts", "line": 45, "anchor": "maxAttempts: 30"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 3600,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/[id]/report.ts", "line": 46, "anchor": "windowMs: 60 * 60 * 1000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/comments/[id]/report.ts", "line": 44, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-029",
+      "file": "src/pages/api/v1/comments/index.ts",
+      "line": 50,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/comments",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/comments/index.ts", "line": 50, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "comments:list:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 120,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/index.ts", "line": 51, "anchor": "maxAttempts: 120"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/index.ts", "line": 52, "anchor": "windowMs: 60 * 1000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/comments/index.ts", "line": 50, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-030",
+      "file": "src/pages/api/v1/comments/index.ts",
+      "line": 109,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/comments",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/comments/index.ts", "line": 109, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "comments:submit:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 20,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/index.ts", "line": 110, "anchor": "maxAttempts: 20"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 3600,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/comments/index.ts", "line": 42, "anchor": "const RATE_LIMIT_WINDOW_MS"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/comments/index.ts", "line": 109, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-031",
+      "file": "src/pages/api/v1/newsletter/confirm.ts",
+      "line": 61,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/newsletter/confirm",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 61, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "newsletter:confirm:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 45, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 46, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 50, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 51, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 61, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-032",
+      "file": "src/pages/api/v1/newsletter/confirm.ts",
+      "line": 138,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/newsletter/confirm",
+      "method": "OPTIONS",
+      "call": {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 138, "anchor": "newsletterPreflightResponse("},
+      "invoked_through": {"file": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "function": "newsletterPreflightResponse"},
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "newsletter:confirm:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 45, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 46, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 50, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/newsletter/confirm.ts", "line": 51, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "anchor": "checkSharedRateLimit("}
+      ]
+    },
+    {
+      "id": "RL-033",
+      "file": "src/pages/api/v1/newsletter/subscribe.ts",
+      "line": 139,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/newsletter/subscribe",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 139, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "newsletter:subscribe:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 61, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 62, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 66, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 67, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 139, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-034",
+      "file": "src/pages/api/v1/newsletter/subscribe.ts",
+      "line": 254,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/newsletter/subscribe",
+      "method": "OPTIONS",
+      "call": {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 254, "anchor": "newsletterPreflightResponse("},
+      "invoked_through": {"file": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "function": "newsletterPreflightResponse"},
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "newsletter:subscribe:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 61, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 62, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 66, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 67, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "anchor": "checkSharedRateLimit("}
+      ]
+    },
+    {
+      "id": "RL-035",
+      "file": "src/pages/api/v1/newsletter/unsubscribe.ts",
+      "line": 63,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/newsletter/unsubscribe",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 63, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "newsletter:unsubscribe:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 47, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 48, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 52, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 53, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 63, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-036",
+      "file": "src/pages/api/v1/newsletter/unsubscribe.ts",
+      "line": 128,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/newsletter/unsubscribe",
+      "method": "OPTIONS",
+      "call": {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 128, "anchor": "newsletterPreflightResponse("},
+      "invoked_through": {"file": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "function": "newsletterPreflightResponse"},
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "newsletter:unsubscribe:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "resolveClientIp(request, clientAddress)", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_MAX",
+            "default": 5,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 47, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 48, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "NEWSLETTER_RATE_LIMIT_WINDOW_SEC",
+            "default": 300,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 52, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/newsletter/unsubscribe.ts", "line": 53, "anchor": "process.env.NEWSLETTER_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": [
+        {"path": "src/modules/newsletter/application/public-newsletter-preflight.ts", "line": 76, "anchor": "checkSharedRateLimit("}
+      ]
+    },
+    {
+      "id": "RL-037",
+      "file": "src/pages/api/v1/setup/initialize.ts",
+      "line": 55,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/setup/initialize",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/setup/initialize.ts", "line": 55, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "setup:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "SETUP_RATE_LIMIT_MAX",
+            "default": 10,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": 10,
+            "declared_at": [
+              {"path": "src/pages/api/v1/setup/initialize.ts", "line": 34, "anchor": "const SETUP_RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/setup/initialize.ts", "line": 35, "anchor": "process.env.SETUP_RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/setup/initialize.ts", "line": 57, "anchor": "Number.isFinite(SETUP_RATE_LIMIT_MAX)"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "SETUP_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": 60,
+            "declared_at": [
+              {"path": "src/pages/api/v1/setup/initialize.ts", "line": 39, "anchor": "const SETUP_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/setup/initialize.ts", "line": 40, "anchor": "process.env.SETUP_RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/setup/initialize.ts", "line": 61, "anchor": "Number.isFinite(SETUP_RATE_LIMIT_WINDOW_SEC)"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/setup/initialize.ts", "line": 55, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-038",
+      "file": "src/pages/api/v1/site-search/query.ts",
+      "line": 83,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/site-search/query",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/site-search/query.ts", "line": 83, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "site-search:query:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "SITE_SEARCH_RATE_LIMIT_MAX",
+            "default": 60,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/site-search/query.ts", "line": 69, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/site-search/query.ts", "line": 70, "anchor": "process.env.SITE_SEARCH_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "SITE_SEARCH_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/site-search/query.ts", "line": 74, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/site-search/query.ts", "line": 75, "anchor": "process.env.SITE_SEARCH_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/site-search/query.ts", "line": 83, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-039",
+      "file": "src/pages/api/v1/site-search/suggest.ts",
+      "line": 46,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/site-search/suggest",
+      "method": "GET",
+      "call": {"path": "src/pages/api/v1/site-search/suggest.ts", "line": 46, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "site-search:suggest:${client_ip}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "client_ip", "expr": "clientIp", "origin": ["resolveClientIp(request, clientAddress)"]}
+          ],
+          "max": {
+            "source": "env",
+            "env": "SITE_SEARCH_SUGGEST_RATE_LIMIT_MAX",
+            "default": 120,
+            "unit": "requests",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/site-search/suggest.ts", "line": 32, "anchor": "const RATE_LIMIT_MAX"},
+              {"path": "src/pages/api/v1/site-search/suggest.ts", "line": 33, "anchor": "process.env.SITE_SEARCH_SUGGEST_RATE_LIMIT_MAX"}
+            ]
+          },
+          "window": {
+            "source": "env",
+            "env": "SITE_SEARCH_SUGGEST_RATE_LIMIT_WINDOW_SEC",
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "parsePositiveIntSetting",
+            "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/site-search/suggest.ts", "line": 37, "anchor": "const RATE_LIMIT_WINDOW_SEC"},
+              {"path": "src/pages/api/v1/site-search/suggest.ts", "line": 38, "anchor": "process.env.SITE_SEARCH_SUGGEST_RATE_LIMIT_WINDOW_SEC"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/site-search/suggest.ts", "line": 46, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    },
+    {
+      "id": "RL-040",
+      "file": "src/pages/api/v1/tenant/domains/[id]/verify.ts",
+      "line": 233,
+      "limiter": "checkSharedRateLimit",
+      "surface": "route",
+      "route": "/api/v1/tenant/domains/[id]/verify",
+      "method": "POST",
+      "call": {"path": "src/pages/api/v1/tenant/domains/[id]/verify.ts", "line": 233, "anchor": "checkSharedRateLimit("},
+      "invoked_through": null,
+      "buckets": [
+        {
+          "name": "route",
+          "key_template": "tenant-domain-verify:${principal}",
+          "shared_across_routes": false,
+          "checked_first": true,
+          "dimensions": [
+            {"name": "principal", "expr": "begun.actorTenantUserId", "origin": ["authenticated tenant user id"]}
+          ],
+          "max": {
+            "source": "literal",
+            "env": null,
+            "default": 30,
+            "unit": "requests",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/tenant/domains/[id]/verify.ts", "line": 48, "anchor": "const VERIFY_RATE_LIMIT"},
+              {"path": "src/pages/api/v1/tenant/domains/[id]/verify.ts", "line": 48, "anchor": "maxAttempts: 30"}
+            ]
+          },
+          "window": {
+            "source": "literal",
+            "env": null,
+            "default": 60,
+            "unit": "seconds",
+            "parsing": "literal",
+            "invalid_value": "fixed in source; not operator-configurable",
+            "invalid_value_fallback": null,
+            "declared_at": [
+              {"path": "src/pages/api/v1/tenant/domains/[id]/verify.ts", "line": 48, "anchor": "windowMs: 60_000"}
+            ]
+          },
+          "source": {"path": "src/pages/api/v1/tenant/domains/[id]/verify.ts", "line": 233, "anchor": "checkSharedRateLimit("}
+        }
+      ],
+      "supporting_facts": []
+    }
+  ],
+  "shared_buckets": [
+    {"key_template": "analytics-collect:${client_ip}", "buckets": ["RL-002:route", "RL-003:route"]},
+    {"key_template": "auth-source:${clientIp}", "buckets": ["RL-004:source", "RL-005:source", "RL-006:source", "RL-007:source", "RL-008:source", "RL-009:source", "RL-010:source", "RL-012:source", "RL-013:source", "RL-016:source", "RL-020:source", "RL-021:source", "RL-026:source"]},
+    {"key_template": "newsletter:confirm:${client_ip}", "buckets": ["RL-031:route", "RL-032:route"]},
+    {"key_template": "newsletter:subscribe:${client_ip}", "buckets": ["RL-033:route", "RL-034:route"]},
+    {"key_template": "newsletter:unsubscribe:${client_ip}", "buckets": ["RL-035:route", "RL-036:route"]}
+  ],
+  "endpoint_classes": [
+    {"route": "/api/v1/analytics/collect", "method": "OPTIONS", "module": null, "rate_limit_sites": ["RL-003"], "other_controls": []},
+    {"route": "/api/v1/analytics/collect", "method": "POST", "module": null, "rate_limit_sites": ["RL-002"], "other_controls": []},
+    {"route": "/api/v1/auth/delegated-access/redeem", "method": "POST", "module": null, "rate_limit_sites": ["RL-004"], "other_controls": []},
+    {"route": "/api/v1/auth/invitations/[token]", "method": "GET", "module": null, "rate_limit_sites": ["RL-005"], "other_controls": []},
+    {"route": "/api/v1/auth/invitations/[token]/accept", "method": "POST", "module": null, "rate_limit_sites": ["RL-006"], "other_controls": ["turnstile-challenge"]},
+    {"route": "/api/v1/auth/login", "method": "POST", "module": null, "rate_limit_sites": ["RL-007", "RL-008"], "other_controls": ["password-lockout", "turnstile-challenge"]},
+    {"route": "/api/v1/auth/mfa/step-up", "method": "POST", "module": null, "rate_limit_sites": ["RL-009"], "other_controls": []},
+    {"route": "/api/v1/auth/mfa/totp/verify", "method": "POST", "module": null, "rate_limit_sites": ["RL-010"], "other_controls": []},
+    {"route": "/api/v1/auth/password/change", "method": "POST", "module": null, "rate_limit_sites": ["RL-011"], "other_controls": []},
+    {"route": "/api/v1/auth/password/forgot", "method": "POST", "module": null, "rate_limit_sites": ["RL-012"], "other_controls": ["turnstile-challenge"]},
+    {"route": "/api/v1/auth/password/reset", "method": "POST", "module": null, "rate_limit_sites": ["RL-013"], "other_controls": ["turnstile-challenge"]},
+    {"route": "/api/v1/auth/preferences", "method": "POST", "module": null, "rate_limit_sites": ["RL-014"], "other_controls": []},
+    {"route": "/api/v1/auth/profile", "method": "PATCH", "module": null, "rate_limit_sites": ["RL-015"], "other_controls": []},
+    {"route": "/api/v1/auth/register", "method": "POST", "module": null, "rate_limit_sites": ["RL-016"], "other_controls": ["turnstile-challenge"]},
+    {"route": "/api/v1/auth/session", "method": "GET", "module": null, "rate_limit_sites": ["RL-019"], "other_controls": []},
+    {"route": "/api/v1/auth/session-handoff/issue", "method": "POST", "module": null, "rate_limit_sites": ["RL-017"], "other_controls": []},
+    {"route": "/api/v1/auth/session-handoff/redeem", "method": "POST", "module": null, "rate_limit_sites": ["RL-018"], "other_controls": []},
+    {"route": "/api/v1/auth/session/switch", "method": "POST", "module": null, "rate_limit_sites": ["RL-020"], "other_controls": []},
+    {"route": "/api/v1/auth/session/tenant", "method": "POST", "module": null, "rate_limit_sites": ["RL-021"], "other_controls": []},
+    {"route": "/api/v1/auth/sessions", "method": "GET", "module": null, "rate_limit_sites": ["RL-023"], "other_controls": []},
+    {"route": "/api/v1/auth/sessions/[id]", "method": "DELETE", "module": null, "rate_limit_sites": ["RL-022"], "other_controls": []},
+    {"route": "/api/v1/auth/sessions/revoke-all", "method": "POST", "module": null, "rate_limit_sites": ["RL-024"], "other_controls": []},
+    {"route": "/api/v1/auth/sso/[providerKey]/callback", "method": "GET", "module": null, "rate_limit_sites": ["RL-025"], "other_controls": []},
+    {"route": "/api/v1/auth/sso/[providerKey]/start", "method": "GET", "module": null, "rate_limit_sites": ["RL-026"], "other_controls": []},
+    {"route": "/api/v1/comments", "method": "GET", "module": null, "rate_limit_sites": ["RL-029"], "other_controls": []},
+    {"route": "/api/v1/comments", "method": "POST", "module": null, "rate_limit_sites": ["RL-030"], "other_controls": []},
+    {"route": "/api/v1/comments/[id]/replies", "method": "POST", "module": null, "rate_limit_sites": ["RL-027"], "other_controls": []},
+    {"route": "/api/v1/comments/[id]/report", "method": "POST", "module": null, "rate_limit_sites": ["RL-028"], "other_controls": []},
+    {"route": "/api/v1/newsletter/confirm", "method": "OPTIONS", "module": null, "rate_limit_sites": ["RL-032"], "other_controls": []},
+    {"route": "/api/v1/newsletter/confirm", "method": "POST", "module": null, "rate_limit_sites": ["RL-031"], "other_controls": []},
+    {"route": "/api/v1/newsletter/subscribe", "method": "OPTIONS", "module": null, "rate_limit_sites": ["RL-034"], "other_controls": []},
+    {"route": "/api/v1/newsletter/subscribe", "method": "POST", "module": null, "rate_limit_sites": ["RL-033"], "other_controls": ["newsletter-recipient-cooldown"]},
+    {"route": "/api/v1/newsletter/unsubscribe", "method": "OPTIONS", "module": null, "rate_limit_sites": ["RL-036"], "other_controls": []},
+    {"route": "/api/v1/newsletter/unsubscribe", "method": "POST", "module": null, "rate_limit_sites": ["RL-035"], "other_controls": []},
+    {"route": "/api/v1/setup/initialize", "method": "POST", "module": null, "rate_limit_sites": ["RL-037"], "other_controls": ["turnstile-challenge"]},
+    {"route": "/api/v1/site-search/query", "method": "GET", "module": null, "rate_limit_sites": ["RL-038"], "other_controls": []},
+    {"route": "/api/v1/site-search/suggest", "method": "GET", "module": null, "rate_limit_sites": ["RL-039"], "other_controls": []},
+    {"route": "/api/v1/tenant/domains/[id]/verify", "method": "POST", "module": null, "rate_limit_sites": ["RL-040"], "other_controls": []},
+    {"route": null, "method": null, "module": "src/modules/seo-distribution/presentation/redirect-middleware.ts", "rate_limit_sites": ["RL-001"], "other_controls": []}
+  ],
+  "other_abuse_controls": [
+    {
+      "id": "password-lockout",
+      "kind": "per-account lockout",
+      "dimensions": [
+        {"name": "principal", "expr": "awcms_principals.id", "origin": []}
+      ],
+      "independent_of_client_ip": true,
+      "max_failed_attempts": {
+        "source": "env",
+        "env": "AUTH_LOGIN_MAX_ATTEMPTS",
+        "default": 5,
+        "unit": "attempts",
+        "parsing": "parsePositiveIntEnv",
+        "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+        "invalid_value_fallback": null,
+        "declared_at": [
+          {"path": "src/modules/identity-access/application/login-policy.ts", "line": 102, "anchor": "parsePositiveIntEnv("},
+          {"path": "src/modules/identity-access/application/login-policy.ts", "line": 103, "anchor": "\"AUTH_LOGIN_MAX_ATTEMPTS\""},
+          {"path": "src/modules/identity-access/application/login-policy.ts", "line": 81, "anchor": "const DEFAULT_MAX_FAILED_ATTEMPTS"}
+        ]
+      },
+      "lockout_duration": {
+        "source": "literal",
+        "env": null,
+        "default": 15,
+        "unit": "minutes",
+        "parsing": "literal",
+        "invalid_value": "fixed in source; not operator-configurable",
+        "invalid_value_fallback": null,
+        "declared_at": [
+          {"path": "src/modules/identity-access/application/login-policy.ts", "line": 106, "anchor": "lockoutMinutes: DEFAULT_LOCKOUT_MINUTES"},
+          {"path": "src/modules/identity-access/application/login-policy.ts", "line": 82, "anchor": "const DEFAULT_LOCKOUT_MINUTES"}
+        ]
+      },
+      "enforced_by": [
+        {"path": "src/modules/identity-access/application/principal-store.ts", "line": 209, "anchor": "UPDATE awcms_principals"},
+        {"path": "src/modules/identity-access/application/principal-store.ts", "line": 210, "anchor": "failed_login_count = failed_login_count + 1"},
+        {"path": "src/modules/identity-access/application/principal-store.ts", "line": 212, "anchor": "CASE WHEN failed_login_count + 1 >="}
+      ],
+      "counted_at": [
+        {"path": "src/pages/api/v1/auth/login.ts", "line": 386, "anchor": "recordPrincipalLoginFailure("},
+        {"path": "src/pages/api/v1/auth/login.ts", "line": 644, "anchor": "recordPrincipalLoginFailure("}
+      ],
+      "applies_to": [
+        {"route": "/api/v1/auth/login", "method": "POST"}
+      ]
+    },
+    {
+      "id": "mfa-factor-lockout",
+      "kind": "per-factor lockout",
+      "dimensions": [
+        {"name": "mfa_factor", "expr": "awcms_identity_mfa_factors row", "origin": []}
+      ],
+      "independent_of_client_ip": true,
+      "max_failed_attempts": {
+        "source": "env",
+        "env": "AUTH_MFA_MAX_VERIFY_ATTEMPTS",
+        "default": 5,
+        "unit": "attempts",
+        "parsing": "Number-env-guarded-in-function",
+        "invalid_value": "an absent, non-numeric or non-positive value falls back to the default",
+        "invalid_value_fallback": null,
+        "declared_at": [
+          {"path": "src/lib/auth/mfa-config.ts", "line": 145, "anchor": "export function resolveMfaMaxVerifyAttempts"},
+          {"path": "src/lib/auth/mfa-config.ts", "line": 148, "anchor": "Number(env.AUTH_MFA_MAX_VERIFY_ATTEMPTS)"},
+          {"path": "src/lib/auth/mfa-config.ts", "line": 24, "anchor": "const DEFAULT_MFA_MAX_VERIFY_ATTEMPTS"}
+        ]
+      },
+      "lockout_duration": {
+        "source": "env",
+        "env": "AUTH_MFA_LOCKOUT_MINUTES",
+        "default": 15,
+        "unit": "minutes",
+        "parsing": "Number-env-guarded-in-function",
+        "invalid_value": "an absent, non-numeric or non-positive value falls back to the default",
+        "invalid_value_fallback": null,
+        "declared_at": [
+          {"path": "src/lib/auth/mfa-config.ts", "line": 155, "anchor": "export function resolveMfaLockoutMinutes"},
+          {"path": "src/lib/auth/mfa-config.ts", "line": 158, "anchor": "Number(env.AUTH_MFA_LOCKOUT_MINUTES)"},
+          {"path": "src/lib/auth/mfa-config.ts", "line": 25, "anchor": "const DEFAULT_MFA_LOCKOUT_MINUTES"}
+        ]
+      },
+      "enforced_by": [
+        {"path": "src/modules/identity-access/application/mfa.ts", "line": 627, "anchor": "async function verifyFactorWithLockout("},
+        {"path": "src/modules/identity-access/application/mfa.ts", "line": 618, "anchor": "Independent of source IP"},
+        {"path": "src/modules/identity-access/application/mfa.ts", "line": 672, "anchor": "resolveMfaMaxVerifyAttempts(env)"},
+        {"path": "src/modules/identity-access/application/mfa.ts", "line": 674, "anchor": "resolveMfaLockoutMinutes(env)"}
+      ],
+      "applies_to": []
+    },
+    {
+      "id": "newsletter-recipient-cooldown",
+      "kind": "per-recipient cooldown on re-sending a confirmation e-mail",
+      "dimensions": [
+        {"name": "recipient", "expr": "(tenant_id, email_normalized)", "origin": []},
+        {"name": "tenant", "expr": "tenant_id of the resolved tenant", "origin": []}
+      ],
+      "independent_of_client_ip": true,
+      "cooldown": {
+        "source": "env",
+        "env": "NEWSLETTER_CONFIRMATION_COOLDOWN_SEC",
+        "default": 900,
+        "unit": "seconds",
+        "parsing": "parsePositiveIntSetting",
+        "invalid_value": "an absent or empty value uses the default; a non-numeric, non-integer, zero or negative value falls back to the default (warned once)",
+        "invalid_value_fallback": null,
+        "declared_at": [
+          {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 89, "anchor": "const CONFIRMATION_COOLDOWN_SEC"},
+          {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 90, "anchor": "process.env.NEWSLETTER_CONFIRMATION_COOLDOWN_SEC"}
+        ]
+      },
+      "passed_to_subscribe": {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 201, "anchor": "CONFIRMATION_COOLDOWN_SEC"},
+      "enforced_by": [
+        {"path": "src/modules/newsletter/application/subscriber-directory.ts", "line": 153, "anchor": "ON CONFLICT (tenant_id, email_normalized) DO UPDATE"},
+        {"path": "src/modules/newsletter/application/subscriber-directory.ts", "line": 177, "anchor": "confirmation_sent_at IS NULL"},
+        {"path": "src/modules/newsletter/application/subscriber-directory.ts", "line": 179, "anchor": "make_interval(secs => ${confirmationCooldownSeconds})"},
+        {"path": "src/modules/newsletter/application/subscriber-directory.ts", "line": 139, "anchor": "confirmationCooldownSeconds: number"}
+      ],
+      "keyed_on_unique_index": {"path": "sql/139_awcms_newsletter_schema.sql", "line": 101, "anchor": "ON awcms_newsletter_subscribers (tenant_id, email_normalized);"},
+      "response_is_neutral": {"path": "src/pages/api/v1/newsletter/subscribe.ts", "line": 96, "anchor": "const NEUTRAL_MESSAGE"},
+      "applies_to": [
+        {"route": "/api/v1/newsletter/subscribe", "method": "POST"}
+      ]
+    },
+    {
+      "id": "turnstile-challenge",
+      "kind": "bot challenge verified server-side; active only when full-online security and Turnstile are both enabled",
+      "dimensions": [],
+      "independent_of_client_ip": false,
+      "enforced_by": [
+        {"path": "src/lib/security/turnstile.ts", "line": 564, "anchor": "export async function enforceTurnstileIfRequired("},
+        {"path": "src/lib/security/turnstile.ts", "line": 465, "anchor": "isFullOnlineSecurityActive(env) && isTurnstileEnabled(env)"},
+        {"path": "src/lib/security/turnstile.ts", "line": 571, "anchor": "if (!isTurnstileRequired(env)) {"}
+      ],
+      "call_sites": [
+        {
+          "route": "/api/v1/auth/invitations/[token]/accept",
+          "method": "POST",
+          "options": "{ action: INVITATION_ACCEPT_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/auth/invitations/[token]/accept.ts", "line": 105, "anchor": "enforceTurnstileIfRequired("}
+        },
+        {
+          "route": "/api/v1/auth/login",
+          "method": "POST",
+          "options": "{ action: LOGIN_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/auth/login.ts", "line": 334, "anchor": "enforceTurnstileIfRequired("}
+        },
+        {
+          "route": "/api/v1/auth/login",
+          "method": "POST",
+          "options": "{ action: LOGIN_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/auth/login.ts", "line": 515, "anchor": "enforceTurnstileIfRequired("}
+        },
+        {
+          "route": "/api/v1/auth/password/forgot",
+          "method": "POST",
+          "options": "{ action: PASSWORD_RESET_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/auth/password/forgot.ts", "line": 116, "anchor": "enforceTurnstileIfRequired("}
+        },
+        {
+          "route": "/api/v1/auth/password/reset",
+          "method": "POST",
+          "options": "{ action: PASSWORD_RESET_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/auth/password/reset.ts", "line": 104, "anchor": "enforceTurnstileIfRequired("}
+        },
+        {
+          "route": "/api/v1/auth/register",
+          "method": "POST",
+          "options": "{ action: REGISTER_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/auth/register.ts", "line": 114, "anchor": "enforceTurnstileIfRequired("}
+        },
+        {
+          "route": "/api/v1/setup/initialize",
+          "method": "POST",
+          "options": "{ action: SETUP_TURNSTILE_ACTION }",
+          "call": {"path": "src/pages/api/v1/setup/initialize.ts", "line": 101, "anchor": "enforceTurnstileIfRequired("}
+        }
+      ],
+      "applies_to": [
+        {"route": "/api/v1/auth/invitations/[token]/accept", "method": "POST"},
+        {"route": "/api/v1/auth/login", "method": "POST"},
+        {"route": "/api/v1/auth/password/forgot", "method": "POST"},
+        {"route": "/api/v1/auth/password/reset", "method": "POST"},
+        {"route": "/api/v1/auth/register", "method": "POST"},
+        {"route": "/api/v1/setup/initialize", "method": "POST"}
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "C-07",
+      "claim": "per-IP rate limits alone could not prevent repeated email delivery to a victim address; recipient-oriented cooldown semantics were required",
+      "verdict": "confirmed",
+      "finding": "POST /api/v1/newsletter/subscribe is limited per client IP only, and a separate per-recipient cooldown is enforced inside the upsert statement: a confirmation e-mail is re-issued to an existing (tenant_id, email_normalized) row only when its confirmation_sent_at is NULL or older than the cooldown. The cooldown is a predicate of the ON CONFLICT ... DO UPDATE branch, so a refused re-send returns the same neutral response as every other branch.",
+      "subscribe_limiter_dimensions": ["client_ip"],
+      "subscribe_limiter_site": {"file": "src/pages/api/v1/newsletter/subscribe.ts", "line": 139},
+      "limiter_sites_with_a_recipient_dimension": 0,
+      "recipient_control": "newsletter-recipient-cooldown",
+      "comparison_password_forgot": {
+        "limiter_dimensions": ["client_ip", "tenant", "scope"],
+        "recipient_dimension_in_limiter": false,
+        "searched_module_function": {"path": "src/modules/identity-access/application/password-reset.ts", "line": 79, "anchor": "export async function requestPasswordReset("},
+        "cooldown_words_searched": ["cooldown", "throttle", "resend", "recently"],
+        "cooldown_word_hits_in_password_reset_module": [],
+        "note": "the forgot-password limiter key holds no identifier or address; whether any other control exists is not derivable from the limiter and is reported only as the word search above"
+      }
+    }
+  ],
+  "frozen_sources": ["sql/139_awcms_newsletter_schema.sql", "src/lib/auth/invitation-config.ts", "src/lib/auth/mfa-config.ts", "src/lib/security/auth-rate-limit.ts", "src/lib/security/env-thresholds.ts", "src/lib/security/rate-limit.ts", "src/lib/security/turnstile.ts", "src/modules/identity-access/application/login-policy.ts", "src/modules/identity-access/application/mfa.ts", "src/modules/identity-access/application/password-reset.ts", "src/modules/identity-access/application/principal-store.ts", "src/modules/newsletter/application/public-newsletter-preflight.ts", "src/modules/newsletter/application/subscriber-directory.ts", "src/modules/seo-distribution/presentation/redirect-middleware.ts", "src/pages/api/v1/analytics/collect.ts", "src/pages/api/v1/auth/delegated-access/redeem.ts", "src/pages/api/v1/auth/invitations/[token].ts", "src/pages/api/v1/auth/invitations/[token]/accept.ts", "src/pages/api/v1/auth/login.ts", "src/pages/api/v1/auth/mfa/step-up.ts", "src/pages/api/v1/auth/mfa/totp/verify.ts", "src/pages/api/v1/auth/password/change.ts", "src/pages/api/v1/auth/password/forgot.ts", "src/pages/api/v1/auth/password/reset.ts", "src/pages/api/v1/auth/preferences.ts", "src/pages/api/v1/auth/profile.ts", "src/pages/api/v1/auth/register.ts", "src/pages/api/v1/auth/session-handoff/issue.ts", "src/pages/api/v1/auth/session-handoff/redeem.ts", "src/pages/api/v1/auth/session.ts", "src/pages/api/v1/auth/session/switch.ts", "src/pages/api/v1/auth/session/tenant.ts", "src/pages/api/v1/auth/sessions/[id].ts", "src/pages/api/v1/auth/sessions/index.ts", "src/pages/api/v1/auth/sessions/revoke-all.ts", "src/pages/api/v1/auth/sso/[providerKey]/callback.ts", "src/pages/api/v1/auth/sso/[providerKey]/start.ts", "src/pages/api/v1/comments/[id]/replies.ts", "src/pages/api/v1/comments/[id]/report.ts", "src/pages/api/v1/comments/index.ts", "src/pages/api/v1/newsletter/confirm.ts", "src/pages/api/v1/newsletter/subscribe.ts", "src/pages/api/v1/newsletter/unsubscribe.ts", "src/pages/api/v1/setup/initialize.ts", "src/pages/api/v1/site-search/query.ts", "src/pages/api/v1/site-search/suggest.ts", "src/pages/api/v1/tenant/domains/[id]/verify.ts"]
+}
