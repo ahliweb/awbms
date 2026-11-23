@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "gate": "VG-01",
-  "status": "partial-frozen-evidence",
+  "status": "frozen-evidence-vg01-pass",
   "generatedAt": "2026-08-29",
   "sources": [
     {

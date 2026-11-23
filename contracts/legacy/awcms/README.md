@@ -124,24 +124,16 @@ e-mail is re-issued to an existing `(tenant_id, email_normalized)` row only if
 other branch. The checker recomputes the verdict from the recorded limiter
 dimensions and the cited SQL.
 
-## What will be proven once the freeze pull request lands
+## Status and what is NOT proven
 
-This README does not discharge `VG-01`; the gate is **PARTIAL** in the
-[Stage 1 gate register](../../../docs/architecture/AWBMS-STAGE-1-GATES.md). The
-per-criterion state is in
-[`VG-01-executable-coverage-2026-11-23.md`](../../../docs/architecture/evidence/VG-01-executable-coverage-2026-11-23.md).
+`VG-01` is **PASS** (2026-11-23,
+[record](../../../docs/architecture/evidence/VG-01-PASS-2026-11-23.md)): all ten inventory items of
+validation §2.2 are frozen with provenance and digests and are consumed by
+checks. That makes this corpus the requirements baseline; it does **not** prove
+parity. Still missing, and owned by `VG-05`:
 
-Closed by the generator and checker extension (frozen by the next `vg01-freeze` run):
-
-- an AWCMS gate inventory classified as enforced / advisory / absent, each entry citing its source (`gates.json`);
-- a complete route inventory with owning module and auth classification, counts reconciled with the repo inventory and the frozen OpenAPI (`routes.json`);
-- structured authorization vectors (actor, credential, tenant relation, operation, expected decision/status, cited test) whose citations resolve to frozen test copies;
-- per-file migration SHA-256 recomputed from the SQL on every pull request (`tools/vg01_verify_migrations.sh`; effective as soon as the change merges, independent of the freeze).
-
-Still missing:
-
-- request/response body fixtures: the pinned source holds no body examples and no recorded responses, so `behaviour-fixtures.json` carries operation-level contracts and test-asserted status/error-code exchanges only;
-- a parity harness that executes the structured vectors (AWBMS has no HTTP runtime to run them against, and several cited tests are static-source assertions rather than requests).
+- request/response body fixtures (the pinned source has none to freeze);
+- a harness that executes the authorization vectors against an AWBMS runtime.
 
 Static repository inventory is not a substitute for live database evidence where the gate requires live state.
 

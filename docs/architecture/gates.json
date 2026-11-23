@@ -5,18 +5,27 @@
     {
       "id": "VG-01",
       "title": "Freeze AWCMS/AWCMS-Astro source-of-truth inputs",
-      "status": "PARTIAL",
+      "status": "PASS",
       "evidence": [
         "contracts/legacy/awcms/manifest.json",
         "contracts/legacy/awcms/fixture-usage.json",
         "docs/architecture/evidence/VG-01-executable-coverage-2026-11-23.md",
-        "docs/architecture/evidence/VG-01-baseline-delta-2026-11-23.md"
+        "docs/architecture/evidence/VG-01-baseline-delta-2026-11-23.md",
+        "contracts/legacy/awcms/frozen/provenance.json",
+        "contracts/legacy/awcms/frozen/static/gates.json",
+        "contracts/legacy/awcms/frozen/static/routes.json",
+        "contracts/legacy/awcms/frozen/static/rate-limits.json",
+        "contracts/legacy/awcms/frozen/static/credential-formats.json",
+        "docs/architecture/evidence/VG-01-PASS-2026-11-23.md"
       ],
       "check": {
         "kind": "script",
         "path": "tools/vg01_verify_frozen.sh"
       },
-      "established": null
+      "established": {
+        "commit": "e81adbdb38dcd17463fdf2b95e1ec05d767dce3e",
+        "run": 45106893843
+      }
     },
     {
       "id": "VG-03",

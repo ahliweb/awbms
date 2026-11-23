@@ -12,7 +12,7 @@ A gate is **PASS** only when its named evidence exists and its pass/fail rule ca
 
 | Gate | Objective | Current status | Required evidence | Pass rule |
 |---|---|---|---|---|
-| `VG-01` | Freeze AWCMS/AWCMS-Astro source-of-truth inputs | **PARTIAL** | provenance manifest, machine-generated inventories, contracts, authorization vectors, live DB RLS/role evidence where required | all required artifacts exist under `contracts/legacy/awcms/`, include source SHA + digest, and are consumed by checks/tests |
+| `VG-01` | Freeze AWCMS/AWCMS-Astro source-of-truth inputs | **PASS** | provenance manifest, machine-generated inventories, contracts, authorization vectors, live DB RLS/role evidence where required | all required artifacts exist under `contracts/legacy/awcms/`, include source SHA + digest, and are consumed by checks/tests |
 | `VG-03` | Resolve/pin Rust toolchain | **PASS** | exact `rust-toolchain.toml`, committed `Cargo.lock`, read-only CI with `--locked` | evidence recorded in `evidence/VG-03-VG-04-2026-08-29.md`; final CI verifies the committed graph and leaves the lockfile unchanged |
 | `VG-04` | Validate Axum/Tokio/SQLx/PostgreSQL fit | **PASS** | minimal verification spike + real PostgreSQL integration tests | evidence recorded in `evidence/VG-03-VG-04-2026-08-29.md`; request lifecycle, graceful shutdown, tenant-local SQLx transaction context and non-superuser FORCE-RLS denial pass |
 | `VG-05` | Correctness/security parity | **OPEN** | golden request/response/DB/auth/audit/event corpus | committed compatibility scope has no unexplained semantic diff |
@@ -50,7 +50,7 @@ These baselines are starting evidence only. A future inventory refresh MUST inte
 ## Gate Sequencing
 
 ```text
-VG-01 source inventory (PARTIAL)
+VG-01 source inventory (PASS)
        |
        +----> Stage-1 decisions validated against reality
        |
@@ -58,7 +58,7 @@ VG-03 toolchain pin (PASS)
        |
 VG-04 verification spike (PASS)
        |
-       +----> Stage 1 may be signed off only after VG-01 + assumptions/approval
+       +----> Stage 1 may be signed off only after open decisions + assumptions/approval
                  |
                  v
              Stage 2 PRD
@@ -74,6 +74,6 @@ VG-15 independence (continuous)
 
 Stage 1 MUST remain `IN PROGRESS` while any Blueprint-blocking assumption is unresolved or while `VG-01`, `VG-03`, or `VG-04` is not PASS.
 
-`VG-03` and `VG-04` are now PASS. Stage 1 still remains `IN PROGRESS` because `VG-01` is partial and the remaining assumption/approval conditions must be closed.
+`VG-01`, `VG-03` and `VG-04` are now PASS ([VG-01 record](evidence/VG-01-PASS-2026-11-23.md)). Stage 1 still remains `IN PROGRESS` because Blueprint-blocking open decisions (`OD-03`, `OD-05`, `OD-06`), the assumption register and the owner's approval are not yet closed.
 
 No later implementation result retroactively substitutes for missing Stage-1 evidence; findings must update the Blueprint and decision register explicitly.
