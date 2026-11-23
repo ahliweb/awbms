@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    # Weekly RustSec re-check: new advisories appear without any code change.
+    - cron: "17 3 * * 1"
 
 concurrency:
   group: awbms-verification-${{ github.ref }}
@@ -15,6 +18,7 @@ permissions:
 jobs:
   vg03-vg04:
     name: VG-03 / VG-04 Rust + PostgreSQL verification
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -110,20 +114,63 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
 
+      - name: Check
+        run: cargo check --workspace --locked
+
       - name: Clippy
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Rustdoc (warnings are errors)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --workspace --no-deps --locked
 
       - name: Prepare least-privilege RLS fixture
         run: psql "$ADMIN_DATABASE_URL" -f tests/fixtures/vg04_rls.sql
 
       - name: Unit and PostgreSQL integration tests
-        run: cargo test --locked --workspace --all-targets
+        run: cargo test --workspace --all-targets --locked
+
+      - name: Documentation tests
+        run: cargo test --workspace --doc --locked
 
       - name: Lockfile remains unchanged
         run: git diff --exit-code -- Cargo.lock
 
+  supply-chain:
+    name: Supply chain (cargo-deny + RustSec)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup override set 1.98.0
+
+      # Tool versions are pinned; install-action verifies the downloaded
+      # binaries against checksums recorded in its own pinned manifests.
+      - name: Install cargo-deny and cargo-audit (pinned versions)
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-deny@0.22.0,cargo-audit@0.23.0
+
+      - name: cargo deny (advisories, licenses, bans, sources)
+        run: cargo deny --locked check
+
+      - name: cargo audit (RustSec)
+        run: cargo audit --deny warnings
+
   vg01-live-awcms-db:
     name: VG-01 controlled AWCMS PostgreSQL introspection
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

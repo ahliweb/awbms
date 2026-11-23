@@ -7,10 +7,15 @@ edition = "2024"
 rust-version = "1.98.0"
 license = "MIT"
 repository = "https://github.com/ahliweb/awbms"
+homepage = "https://github.com/ahliweb/awbms"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
 
 [workspace.dependencies]
 axum = "=0.8.9"
 sqlx = { version = "=0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres"] }
-tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time"] }
+tokio = { version = "=1.53.3", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time"] }
 tower = { version = "=0.5.3", features = ["util"] }
 tower-http = { version = "=0.7.0", features = ["limit", "request-id", "timeout"] }

@@ -1,3 +1,7 @@
+//! PostgreSQL integration test proving FORCE RLS tenant isolation (VG-04).
+//!
+//! Skipped when `AWBMS_TEST_DATABASE_URL` is not set.
+
 use std::{env, error::Error};
 
 use awbms_verification::TenantTransaction;

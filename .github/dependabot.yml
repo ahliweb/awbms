@@ -1,0 +1,30 @@
+# Dependency update PRs are proposals for human review. Nothing here enables
+# auto-merge; every update goes through the normal review and CI gates.
+# See docs/security/supply-chain.md.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci(deps)"
+    labels:
+      - dependencies
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

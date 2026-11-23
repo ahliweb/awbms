@@ -1,11 +1,19 @@
 [package]
 name = "awbms-verification"
 version = "0.0.0"
+description = "AWBMS Stage-1 verification spike: Axum/Tower lifecycle and PostgreSQL RLS tenant-isolation checks (not published)"
+readme = false
+keywords = ["awbms", "verification"]
+categories = ["development-tools::testing"]
 publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
 
 [dependencies]
 axum.workspace = true
