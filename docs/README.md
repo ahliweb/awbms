@@ -63,7 +63,9 @@ trusted.
 
 | Document | Status |
 |---|---|
-| [Security documentation index](security/README.md) | Placeholder — see its own gap list |
+| [Security documentation index](security/README.md) | Current — see its own gap list |
+| [Initial threat model](security/AWBMS-THREAT-MODEL.md) | Draft — awaiting human security review |
+| [Privacy analysis / DPIA](security/AWBMS-PRIVACY-ANALYSIS.md) | Draft — awaiting privacy/legal review |
 | [Security policy and vulnerability reporting](../SECURITY.md) | Current — pre-release, NOT PRODUCTION READY |
 | [Supply-chain policy](security/supply-chain.md) | Current — `cargo-deny`, `cargo audit`, Dependabot, exception policy |
 
