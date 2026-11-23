@@ -978,15 +978,9 @@ AWBMS should inherit the *lesson and control objective*, not necessarily the ori
 
 ## 26. Stage-1 Gate Register
 
-| Gate | Current state | Required evidence before Stage-1 sign-off |
-|---|---|---|
-| `VG-01` AWCMS source inventory | **PARTIAL** | frozen machine-generated AWCMS + Astro artifacts under `contracts/legacy/awcms/`, provenance, hashes, live DB RLS/roles where required, auth vectors |
-| `VG-03` toolchain resolution | **PARTIAL** | actual `rust-toolchain.toml`, build evidence |
-| `VG-04` ecosystem validation | **PARTIAL** | Axum/SQLx/Tokio/PostgreSQL spike + tests; sensitive behavior verified |
-| `VG-05` parity | NOT STARTED | golden request/DB/audit/event comparison |
-| `VG-09` performance | NOT STARTED | reproducible baseline corpus |
-| `VG-12` recovery | NOT STARTED | restore/rollback rehearsal |
-| `VG-15` repo independence | CURRENTLY TRUE / needs automation | CI check against source/runtime AWCMS coupling |
+Gate status is maintained in one place only: the [Stage 1 gate register](AWBMS-STAGE-1-GATES.md), backed by the machine-readable [`gates.json`](gates.json) that `scripts/check-docs.sh` checks against the evidence. This section previously carried its own status table, which drifted from the register (it still showed `VG-03`/`VG-04` as PARTIAL after both passed); it is replaced by this pointer so that the status cannot be stated twice.
+
+The Stage-1 sign-off requirements in [§31](#31-recommended-stage-transition) are unchanged.
 
 ---
 

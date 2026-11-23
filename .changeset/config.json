@@ -4,7 +4,11 @@
   "changelogFile": "CHANGELOG.md",
   "changesetDir": ".changeset",
   "tagPrefix": "v",
-  "bumpLevels": ["major", "minor", "patch"],
+  "bumpLevels": [
+    "major",
+    "minor",
+    "patch"
+  ],
   "changeTypes": [
     "added",
     "changed",
@@ -22,7 +26,9 @@
     "scripts",
     "ci",
     "contracts",
-    "workspace"
+    "workspace",
+    "docs",
+    "dependencies"
   ],
   "preOneZeroPolicy": "While MAJOR is 0 the platform is pre-Blueprint. 1.0.0 is reserved for the first production cutover accepted under §54 Go/No-Go."
 }

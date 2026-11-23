@@ -63,7 +63,7 @@
     {"id":"authorization-vectors","status":"frozen-register-pending-parity-execution"},
     {"id":"astro-consumer-contract","status":"frozen-and-verified"},
     {"id":"representative-behavior-fixtures","status":"pending"},
-    {"id":"artifact-usage-check","status":"implemented-for-current-frozen-corpus"}
+    {"id":"artifact-usage-check","status":"implemented","check":"tools/vg01_verify_frozen.sh (fixture-usage.json)"}
   ],
   "remainingBlockers": [
     "structured route ownership/auth classification inventory",

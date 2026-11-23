@@ -8,14 +8,17 @@
 | [AWBMS Master Blueprint](AWBMS-MASTER-BLUEPRINT.md) | Stage 1 formalisation of the validated architecture |
 | [Stage 1 gates](AWBMS-STAGE-1-GATES.md) | Per-gate status and the evidence each one requires. **The authoritative gate status** |
 | [Invariant traceability](AWBMS-INVARIANT-TRACEABILITY.md) | AWCMS invariant → AWBMS control → automated check |
-| [`evidence/`](evidence/) | Dated gate evidence records (`VG-01` static pipeline, `VG-03`/`VG-04`) |
+| [`gates.json`](gates.json) | Machine-readable gate register; `scripts/check-docs.sh` keeps the Stage 1 table and Appendix E statuses equal to it |
+| [Pre-production evidence specification](AWBMS-PRE-PRODUCTION-EVIDENCE.md) | CI invariant gates required before surfaces expand, and the evidence shape of `VG-05`/`VG-09`/`VG-12`. Specification only |
+| [`evidence/`](evidence/) | Dated gate evidence records: `VG-01` static pipeline, executable coverage, baseline delta and publication procedure; `VG-03`/`VG-04`; main verification run |
 
-> **Two gate registers exist, and that is a drift risk.** Appendix E of the
-> validation and `AWBMS-STAGE-1-GATES.md` both carry gate status. The Stage 1
-> document is authoritative for *status*; Appendix E is authoritative for what
-> each gate *means* and which decision it backs. Nothing currently keeps the
-> status columns equal — reconciling them, or making one generated from the
-> other, is outstanding work.
+> **Two gate registers exist; their status columns are checked, not trusted.**
+> Appendix E of the validation and `AWBMS-STAGE-1-GATES.md` both carry gate
+> status. The Stage 1 document is authoritative for *status*; Appendix E is
+> authoritative for what each gate *means* and which decision it backs. Since
+> 2026-11-23 both are compared against [`gates.json`](gates.json) by
+> `scripts/check-docs.sh`, which fails on any disagreement or on a PASS without
+> recorded evidence.
 
 ## Reading order
 
@@ -32,7 +35,8 @@ than front to back.
 4. **Appendix D — Open decisions.** What is *not* decided. Four of these block
    Blueprint sign-off.
 5. **Appendix E — Verification gates.** What evidence would make any of this
-   more than a proposal. None has been produced.
+   more than a proposal. Current status is in the Stage 1 gate register; no gate
+   covering AWBMS behaviour (parity, performance, recovery) has passed.
 6. Then the sections that matter for your work, via the map below.
 
 ## Section map
@@ -73,8 +77,9 @@ keeping the auditable surface small enough to actually audit.
 ## What this does not contain
 
 No threat model, ERD, data dictionary, RBAC/ABAC/RLS matrix, API contract, SLO
-target, or implementation plan. Those are Master Blueprint deliverables listed
-in §49.2, and the Blueprint has not begun.
+target, or implementation plan. Those are deliverables of the later lifecycle steps listed
+in §49.2 and §50; the Master Blueprint (Stage 1) is in progress and does not
+yet contain them.
 
 No measurement of any kind. §23 is explicit that no benchmark has been designed
 or run, and that no number in it may be quoted as a result.

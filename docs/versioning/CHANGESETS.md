@@ -73,7 +73,7 @@ Keep a Changelog vocabulary:
 ### `component` — which part of the system
 
 `architecture-validation` · `adr` · `governance` · `versioning` · `skills` ·
-`scripts` · `ci` · `contracts` · `workspace`
+`scripts` · `ci` · `contracts` · `workspace` · `docs` · `dependencies`
 
 The list is closed and lives in [`.changeset/config.json`](../../.changeset/config.json).
 Adding a component is itself a `minor` / `changed` / `versioning` change.
