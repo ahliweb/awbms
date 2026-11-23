@@ -1095,7 +1095,8 @@ These decisions were accepted by the repository owner on 2026-11-23 through ADR-
 
 **Current:** Stage 1 signed off 2026-11-23 (ADR-0008).  
 **Not yet:** implementation — waits for gate 9.  
-**Next after Stage-1 completion:** Stage 2 — AWBMS PRD.
+**Next after Stage-1 completion:** Stage 2 — AWBMS PRD.  
+**In progress:** Stage 2 draft — [PRD](../product/AWBMS-PRD.md) and [user research](../product/AWBMS-USER-RESEARCH.md); owner decisions `PD-01`…`PD-22` pending.
 
 Stage 2 should convert the architectural scope into:
 

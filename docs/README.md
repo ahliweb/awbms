@@ -15,6 +15,13 @@ trusted.
 | [Stage 1 gate register](architecture/AWBMS-STAGE-1-GATES.md) | Authoritative status | Per-gate status, backed by [`gates.json`](architecture/gates.json). |
 | [Pre-production evidence specification](architecture/AWBMS-PRE-PRODUCTION-EVIDENCE.md) | Specification only | CI invariant gates and `VG-05`/`VG-09`/`VG-12` evidence shape. |
 
+### Product (Stage 2)
+
+| Document | Status | Purpose |
+|---|---|---|
+| [AWBMS Stage 2 PRD](product/AWBMS-PRD.md) | Draft — owner decisions `PD-01`…`PD-22` pending | Capabilities, `REQ-` requirements with MoSCoW and acceptance scenarios, service tiers, SLO, RTO/RPO, capacity, migration success criteria |
+| [AWBMS user research](product/AWBMS-USER-RESEARCH.md) | Draft — desk research, no interviews | Personas `P-01`…`P-08`, jobs-to-be-done, usage evidence, untested assumptions `UA-` and validation plan |
+
 
 ### Research (non-binding)
 
