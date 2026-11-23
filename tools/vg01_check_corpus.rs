@@ -1588,6 +1588,715 @@ fn structured_vectors(c: &Ctx, vs: &[Json]) -> R {
     Ok(())
 }
 
+// ------------------------------------------- rate limits and credentials ----
+//
+// rate-limits.json and credential-formats.json are derived by
+// tools/vg01_inventory.rs from the pinned AWCMS implementation. Every fact in
+// them cites `path`, `line` and an `anchor`; the cited files are frozen under
+// source/awcms-impl/, so the checks below re-resolve each citation in the
+// corpus and recompute what can be recomputed from the frozen copies alone.
+// Like the structured artifacts above they are gated by pendingArtifacts.
+
+const RATE_LIMITS: &str = "frozen/static/rate-limits.json";
+const CREDENTIALS: &str = "frozen/static/credential-formats.json";
+const IMPL: &str = "frozen/static/source/awcms-impl";
+const IMPL_TREE: &str = "frozen/static/source/awcms-impl/";
+
+/// Frozen implementation files, read once.
+struct ImplFiles<'a> {
+    c: &'a Ctx,
+    cache: RefCell<BTreeMap<String, Vec<String>>>,
+}
+
+impl<'a> ImplFiles<'a> {
+    fn new(c: &'a Ctx) -> Self {
+        ImplFiles { c, cache: RefCell::new(BTreeMap::new()) }
+    }
+
+    fn with<T>(&self, path: &str, f: impl FnOnce(&[String]) -> T) -> Result<T, String> {
+        let mut cache = self.cache.borrow_mut();
+        if !cache.contains_key(path) {
+            ensure(!path.contains(".."), format!("{path}: path escapes the frozen tree"))?;
+            let lines = self.c.lines(&format!("{IMPL}/{path}")).map_err(|e| format!("cited file is not frozen: {e}"))?;
+            cache.insert(path.to_owned(), lines);
+        }
+        Ok(f(&cache[path]))
+    }
+
+    fn line(&self, path: &str, line: usize) -> Result<String, String> {
+        self.with(path, |lines| line.checked_sub(1).and_then(|i| lines.get(i).cloned()))?.ok_or(format!("{path}:{line}: no such line in the frozen copy"))
+    }
+
+    /// Frozen files below `prefix` (for example `src/` or `sql/`).
+    fn paths(&self, prefix: &str) -> Result<Vec<String>, String> {
+        let base = self.c.root.join(IMPL);
+        let mut all = Vec::new();
+        if base.is_dir() {
+            walk(&base, &base, &mut all)?;
+        }
+        all.sort();
+        Ok(all.into_iter().filter(|p| p.starts_with(prefix)).collect())
+    }
+}
+
+fn walk_facts(j: &Json, out: &mut Vec<(String, usize, String)>) {
+    match j {
+        Json::Obj(items) => {
+            if let (Some(p), Some(l), Some(a)) = (j.get("path").and_then(Json::str), j.get("line").and_then(Json::num), j.get("anchor").and_then(Json::str)) {
+                out.push((p.to_owned(), l as usize, a.to_owned()));
+            }
+            for (_, v) in items {
+                walk_facts(v, out);
+            }
+        }
+        Json::Arr(items) => {
+            for v in items {
+                walk_facts(v, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Every citation resolves in the frozen copy, and `frozen_sources` is exactly the set of cited files.
+fn check_facts(files: &ImplFiles, j: &Json, what: &str) -> Result<usize, String> {
+    let mut facts = Vec::new();
+    walk_facts(j, &mut facts);
+    ensure(!facts.is_empty(), format!("{what}: no citations"))?;
+    let mut cited = BTreeSet::new();
+    for (path, line, anchor) in &facts {
+        let text = files.line(path, *line)?;
+        ensure(!anchor.is_empty() && text.contains(anchor.as_str()), format!("{what}: anchor `{anchor}` is not on {path}:{line} of the frozen copy"))?;
+        cited.insert(path.clone());
+    }
+    let listed: BTreeSet<String> = nonempty_strs(j, "frozen_sources", what)?.into_iter().collect();
+    ensure_eq(&format!("{what}: frozen_sources vs cited files"), listed, cited)?;
+    Ok(facts.len())
+}
+
+/// When both artifacts are present, the frozen implementation tree is exactly
+/// the union of the files they list.
+fn check_impl_tree(c: &Ctx, files: &ImplFiles) -> R {
+    let mut union = BTreeSet::new();
+    for rel in [RATE_LIMITS, CREDENTIALS] {
+        if !c.root.join(rel).is_file() {
+            return Ok(());
+        }
+        for p in nonempty_strs(&c.json(rel)?, "frozen_sources", rel)? {
+            union.insert(p);
+        }
+    }
+    let on_disk: BTreeSet<String> = files.paths("")?.into_iter().collect();
+    ensure_eq("frozen implementation tree vs files cited by both artifacts", on_disk, union)
+}
+
+fn lit_product(s: &str) -> Option<u64> {
+    let mut acc: u64 = 1;
+    for part in s.split('*') {
+        let p = part.trim().replace('_', "");
+        if p.is_empty() || !p.chars().all(|c| c.is_ascii_digit()) {
+            return None;
+        }
+        acc = acc.checked_mul(p.parse::<u64>().ok()?)?;
+    }
+    Some(acc)
+}
+
+fn number_tokens(text: &str) -> Vec<u64> {
+    text.replace('_', "")
+        .split(|ch: char| !ch.is_ascii_digit())
+        .filter(|t| !t.is_empty())
+        .filter_map(|t| t.parse::<u64>().ok())
+        .collect()
+}
+
+/// `/src/pages/a/[id]/index.ts` style path -> route, as AWCMS names it.
+fn route_of_file(file: &str) -> Option<String> {
+    let rest = file.strip_prefix("src/pages/")?;
+    let mut route = rest.to_owned();
+    for ext in [".ts", ".astro", ".js"] {
+        if let Some(stripped) = route.strip_suffix(ext) {
+            route = stripped.to_owned();
+            break;
+        }
+    }
+    if let Some(stripped) = route.strip_suffix("/index") {
+        route = stripped.to_owned();
+    }
+    Some(format!("/{}", route.trim_start_matches('/')))
+}
+
+fn ident_before(line: &str, at: usize) -> bool {
+    line[..at].chars().next_back().is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn is_code_line(line: &str) -> bool {
+    let t = line.trim_start();
+    !(t.starts_with("//") || t.starts_with('*') || t.starts_with("/*"))
+}
+
+const LIMITER_NEEDLES: [&str; 3] = ["checkSharedRateLimit(", "checkAuthRateLimit(", "checkRateLimit("];
+const LIMITER_MODULE_FILES: [&str; 2] = ["src/lib/security/rate-limit.ts", "src/lib/security/auth-rate-limit.ts"];
+const DIMENSIONS: [&str; 5] = ["client_ip", "tenant", "scope", "principal", "recipient"];
+const PARSINGS: [&str; 7] = [
+    "literal",
+    "parsePositiveIntSetting",
+    "parsePositiveIntEnv",
+    "Number-coercion-guarded",
+    "Number-coercion-unguarded",
+    "Number-env-guarded-in-function",
+    "parseCeiling",
+];
+
+/// Non-comment limiter call lines in the frozen route and module files.
+fn recount_limiter_calls(files: &ImplFiles) -> Result<BTreeSet<(String, usize)>, String> {
+    let mut out = BTreeSet::new();
+    for path in files.paths("src/")? {
+        if LIMITER_MODULE_FILES.contains(&path.as_str()) || !(path.ends_with(".ts") || path.ends_with(".astro")) {
+            continue;
+        }
+        files.with(&path, |lines| {
+            for (index, line) in lines.iter().enumerate() {
+                if is_code_line(line) {
+                    for needle in LIMITER_NEEDLES {
+                        if let Some(at) = line.find(needle)
+                            && !ident_before(line, at)
+                        {
+                            out.insert((path.clone(), index + 1));
+                        }
+                    }
+                }
+            }
+        })?;
+    }
+    Ok(out)
+}
+
+/// One threshold or window as recorded: shape, parser name, and a default that
+/// the cited lines of the frozen copy actually contain.
+fn check_setting(files: &ImplFiles, v: &Json, what: &str) -> R {
+    let source = str_field(v, "source", what)?;
+    ensure(["env", "literal"].contains(&source), format!("{what}: bad source {source}"))?;
+    let default = num_field(v, "default", what)?;
+    ensure(default >= 1, format!("{what}: default must be a positive number"))?;
+    let unit = str_field(v, "unit", what)?;
+    ensure(["requests", "seconds", "attempts", "minutes"].contains(&unit), format!("{what}: bad unit {unit}"))?;
+    let parsing = str_field(v, "parsing", what)?;
+    ensure(PARSINGS.contains(&parsing), format!("{what}: unknown parsing {parsing}"))?;
+    ensure(!str_field(v, "invalid_value", what)?.is_empty(), format!("{what}: empty invalid_value"))?;
+    let env = field(v, "env", what)?.str();
+    ensure_eq(&format!("{what}: env iff source=env"), env.is_some(), source == "env")?;
+    ensure_eq(&format!("{what}: literal iff parsing=literal"), parsing == "literal", source == "literal")?;
+    let mut facts = Vec::new();
+    walk_facts(field(v, "declared_at", what)?, &mut facts);
+    ensure(!facts.is_empty(), format!("{what}: no declaration cited"))?;
+    if let Some(env) = env {
+        ensure(env.chars().all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_'), format!("{what}: bad env name {env}"))?;
+        let mut named = false;
+        for (path, line, _) in &facts {
+            named |= files.line(path, *line)?.contains(env);
+        }
+        ensure(named, format!("{what}: no cited line names {env}"))?;
+        let mut near = false;
+        for (path, line, _) in &facts {
+            for n in line.saturating_sub(3).max(1)..=*line + 3 {
+                if let Ok(text) = files.line(path, n) {
+                    near |= number_tokens(&text).contains(&default);
+                }
+            }
+        }
+        ensure(near, format!("{what}: default {default} is not within three lines of any cited declaration"))?;
+    } else {
+        let mut candidates = Vec::new();
+        for (path, line, anchor) in &facts {
+            let text = files.line(path, *line)?;
+            if let Some((_, expr)) = anchor.split_once(": ") {
+                candidates.extend(lit_product(expr));
+            } else if anchor.starts_with("const ")
+                && let Some((_, rhs)) = text.split_once('=')
+            {
+                candidates.extend(lit_product(rhs.trim().trim_end_matches(';')));
+            }
+        }
+        let accepted = candidates.iter().any(|x| *x == default || (unit == "seconds" && *x == default * 1000));
+        ensure(accepted, format!("{what}: literal default {default} does not match the cited source ({candidates:?})"))?;
+    }
+    Ok(())
+}
+
+fn check_rate_limits(c: &Ctx) -> R {
+    if !artifact_present(c, RATE_LIMITS)? {
+        return Ok(());
+    }
+    ensure(artifact_present(c, IMPL_TREE)?, "rate-limits.json is present but the frozen implementation tree it cites is absent")?;
+    let p = provenance(c)?;
+    let j = c.json(RATE_LIMITS)?;
+    same_sha(&j, "source_sha", &p.awcms, "rate-limits.json")?;
+    let files = ImplFiles::new(c);
+    check_facts(&files, &j, "rate-limits.json")?;
+    check_impl_tree(c, &files)?;
+    ensure(!nonempty_strs(&j, "not_derivable_from_source", "rate-limits.json")?.is_empty(), "rate-limits.json: no statement of what is not derivable")?;
+    let statements = arr_field(&j, "limiter", "rate-limits.json")?;
+    for required in ["algorithm", "redis-backend", "redis-failure-is-fail-open", "client-ip-trust", "threshold-parser-parsePositiveIntSetting"] {
+        ensure(statements.iter().any(|s| s.get("id").and_then(Json::str) == Some(required)), format!("limiter statement {required} is missing"))?;
+    }
+
+    // Completeness against the frozen copies: every limiter call line is a site.
+    let recount = recount_limiter_calls(&files)?;
+    let sites = arr_field(&j, "call_sites", "rate-limits.json")?;
+    let (routes, route_pairs): (Option<BTreeSet<(String, String)>>, Option<BTreeSet<(String, String)>>) = if c.root.join(ROUTES).is_file() {
+        let r = c.json(ROUTES)?;
+        let all = arr_field(&r, "routes", "routes.json")?;
+        (
+            Some(all.iter().filter_map(|x| Some((x.get("file")?.str()?.to_owned(), x.get("method")?.str()?.to_owned()))).collect()),
+            Some(all.iter().filter_map(|x| Some((x.get("route")?.str()?.to_owned(), x.get("method")?.str()?.to_owned()))).collect()),
+        )
+    } else {
+        (None, None)
+    };
+    let mut lines_seen = BTreeSet::new();
+    let mut ids = BTreeSet::new();
+    let mut dims_by_id: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut bucket_count = 0u64;
+    let mut recipient_sites = 0u64;
+    let mut groups: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut route_methods = BTreeSet::new();
+    let mut unguarded = 0u64;
+    for (index, s) in sites.iter().enumerate() {
+        let id = str_field(s, "id", "call site")?;
+        ensure_eq("call site id sequence", id, format!("RL-{:03}", index + 1).as_str())?;
+        ensure(ids.insert(id.to_owned()), format!("{id}: duplicate"))?;
+        let file = str_field(s, "file", id)?;
+        let line = num_field(s, "line", id)? as usize;
+        let limiter = str_field(s, "limiter", id)?;
+        ensure(["checkSharedRateLimit", "checkAuthRateLimit"].contains(&limiter), format!("{id}: bad limiter {limiter}"))?;
+        let call = field(s, "call", id)?;
+        ensure_eq(&format!("{id}: call fact path"), str_field(call, "path", id)?, file)?;
+        ensure_eq(&format!("{id}: call fact line"), num_field(call, "line", id)? as usize, line)?;
+        // The counted line is the call line itself, or the wrapper's line when invoked through one.
+        match field(s, "invoked_through", id)? {
+            Json::Null => {
+                ensure(files.line(file, line)?.contains(&format!("{limiter}(")), format!("{id}: no {limiter}( call at {file}:{line}"))?;
+                lines_seen.insert((file.to_owned(), line));
+            }
+            wrapper => {
+                let (wfile, wline) = (str_field(wrapper, "file", id)?, num_field(wrapper, "line", id)? as usize);
+                let function = str_field(wrapper, "function", id)?;
+                ensure(files.line(wfile, wline)?.contains(&format!("{limiter}(")), format!("{id}: the wrapper line {wfile}:{wline} holds no {limiter}( call"))?;
+                ensure(files.line(file, line)?.contains(&format!("{function}(")), format!("{id}: {file}:{line} does not call the wrapper {function}"))?;
+                lines_seen.insert((wfile.to_owned(), wline));
+            }
+        }
+        let surface = str_field(s, "surface", id)?;
+        ensure(["route", "module"].contains(&surface), format!("{id}: bad surface"))?;
+        let method = field(s, "method", id)?.str();
+        let route = field(s, "route", id)?.str();
+        if surface == "route" {
+            let (Some(route), Some(method)) = (route, method) else { return Err(format!("{id}: route site without route/method")) };
+            ensure_eq(&format!("{id}: route vs file path"), Some(route.to_owned()), route_of_file(file))?;
+            if let Some(known) = &routes {
+                ensure(known.contains(&(file.to_owned(), method.to_owned())), format!("{id}: {method} {file} is not a handler in routes.json"))?;
+            }
+            route_methods.insert((route.to_owned(), method.to_owned()));
+        } else {
+            ensure(route.is_none() && method.is_none(), format!("{id}: module site with a route"))?;
+        }
+        let buckets = arr_field(s, "buckets", id)?;
+        ensure(!buckets.is_empty(), format!("{id}: no buckets"))?;
+        ensure_eq(&format!("{id}: bucket count for {limiter}"), buckets.len(), if limiter == "checkAuthRateLimit" { 2 } else { 1 })?;
+        let site_text = {
+            let mut text = String::new();
+            for n in line..=line + 6 {
+                if let Ok(t) = files.line(file, n) {
+                    text.push_str(&t);
+                    text.push('\n');
+                }
+            }
+            text
+        };
+        let mut names = Vec::new();
+        let mut site_unguarded = false;
+        for b in buckets {
+            bucket_count += 1;
+            let name = str_field(b, "name", id)?;
+            ensure(["source", "scope", "route"].contains(&name), format!("{id}: bad bucket name {name}"))?;
+            let key = str_field(b, "key_template", id)?;
+            ensure(key.contains("${"), format!("{id}: key template has no dimension"))?;
+            groups.entry(key.to_owned()).or_default().insert(format!("{id}:{name}"));
+            let dims = arr_field(b, "dimensions", id)?;
+            ensure(!dims.is_empty(), format!("{id}: bucket without dimensions"))?;
+            for d in dims {
+                let dn = str_field(d, "name", id)?;
+                ensure(DIMENSIONS.contains(&dn), format!("{id}: unknown dimension {dn}"))?;
+                if name != "source" {
+                    names.push(dn.to_owned());
+                }
+            }
+            if name == "route" {
+                let prefix = key.split("${").next().unwrap_or("");
+                let literal = prefix.trim_end_matches(':');
+                // A wrapper's key literal lives in the invoking call, which `call` points at.
+                ensure(site_text.contains(literal) || literal.is_empty(), format!("{id}: key prefix `{literal}` is not in the cited call"))?;
+            }
+            if name == "scope" {
+                let scope = key.rsplit(':').next().unwrap_or("");
+                files.with(file, |all| all.iter().any(|l| l.contains(&format!("\"{scope}\""))))?.then_some(()).ok_or(format!("{id}: scope `{scope}` is not a literal in {file}"))?;
+            }
+            for (label, unit) in [("max", "requests"), ("window", "seconds")] {
+                let setting = field(b, label, id)?;
+                check_setting(&files, setting, &format!("{id} {name} {label}"))?;
+                ensure_eq(&format!("{id} {name} {label}: unit"), str_field(setting, "unit", id)?, unit)?;
+                site_unguarded |= str_field(setting, "parsing", id)? == "Number-coercion-unguarded";
+            }
+        }
+        if site_unguarded {
+            unguarded += 1;
+        }
+        if names.iter().any(|n| n == "recipient") {
+            recipient_sites += 1;
+        }
+        dims_by_id.insert(id.to_owned(), names);
+    }
+    ensure_eq("limiter call lines vs the frozen copies", lines_seen, recount.clone())?;
+    let summary = field(&j, "summary", "rate-limits.json")?;
+    ensure_eq("summary limiter_call_lines", num_field(summary, "limiter_call_lines", "summary")?, recount.len() as u64)?;
+    ensure_eq("summary call_sites", num_field(summary, "call_sites", "summary")?, sites.len() as u64)?;
+    ensure_eq("summary buckets", num_field(summary, "buckets", "summary")?, bucket_count)?;
+    ensure_eq("summary distinct_route_method_pairs", num_field(summary, "distinct_route_method_pairs", "summary")?, route_methods.len() as u64)?;
+    ensure_eq("summary sites_with_recipient_dimension", num_field(summary, "sites_with_recipient_dimension", "summary")?, recipient_sites)?;
+    ensure_eq("summary sites_with_unvalidated_number_coercion", arr_field(summary, "sites_with_unvalidated_number_coercion", "summary")?.len() as u64, unguarded)?;
+
+    // Shared buckets: exactly the key templates two or more buckets use.
+    let recorded: BTreeMap<String, BTreeSet<String>> = arr_field(&j, "shared_buckets", "rate-limits.json")?
+        .iter()
+        .map(|g| Ok((str_field(g, "key_template", "shared bucket")?.to_owned(), nonempty_strs(g, "buckets", "shared bucket")?.into_iter().collect())))
+        .collect::<Result<_, String>>()?;
+    let expected: BTreeMap<String, BTreeSet<String>> = groups.into_iter().filter(|(_, m)| m.len() > 1).collect();
+    ensure_eq("shared_buckets vs bucket keys", recorded, expected)?;
+
+    // Endpoint classes cover every site exactly once.
+    let mut covered = BTreeSet::new();
+    for class in arr_field(&j, "endpoint_classes", "rate-limits.json")? {
+        for id in nonempty_strs(class, "rate_limit_sites", "endpoint class")? {
+            ensure(ids.contains(&id), format!("endpoint class cites unknown site {id}"))?;
+            ensure(covered.insert(id.clone()), format!("site {id} is in two endpoint classes"))?;
+        }
+    }
+    ensure_eq("endpoint classes cover every site", covered, ids)?;
+    ensure_eq("summary endpoint_classes", num_field(summary, "endpoint_classes", "summary")?, arr_field(&j, "endpoint_classes", "rate-limits.json")?.len() as u64)?;
+
+    // Other abuse controls.
+    let controls = arr_field(&j, "other_abuse_controls", "rate-limits.json")?;
+    let control = |id: &str| controls.iter().find(|x| x.get("id").and_then(Json::str) == Some(id)).ok_or(format!("abuse control {id} is missing"));
+    for required in ["password-lockout", "mfa-factor-lockout", "newsletter-recipient-cooldown", "turnstile-challenge"] {
+        let ctl = control(required)?;
+        for a in arr_field(ctl, "applies_to", required)? {
+            let pair = (str_field(a, "route", required)?.to_owned(), str_field(a, "method", required)?.to_owned());
+            if let Some(known) = &route_pairs {
+                ensure(known.contains(&pair), format!("{required}: applies to {pair:?}, which is not a handler in routes.json"))?;
+            }
+        }
+    }
+    let lockout = control("password-lockout")?;
+    ensure(arr_field(lockout, "enforced_by", "password-lockout")?.iter().any(|f| f.get("anchor").and_then(Json::str) == Some("failed_login_count = failed_login_count + 1")), "password-lockout: the in-database counter is not cited")?;
+    ensure_eq("password-lockout applies_to", arr_field(lockout, "applies_to", "password-lockout")?.len(), 1)?;
+
+    // C-07, recomputed from the recorded limiter dimensions and the cited SQL.
+    let claims = arr_field(&j, "claims", "rate-limits.json")?;
+    ensure_eq("claims recorded", claims.len(), 1)?;
+    let claim = &claims[0];
+    ensure_eq("claim id", str_field(claim, "id", "claim")?, "C-07")?;
+    let subscribe = sites
+        .iter()
+        .find(|s| s.get("route").and_then(Json::str) == Some("/api/v1/newsletter/subscribe") && s.get("method").and_then(Json::str) == Some("POST"))
+        .ok_or("no limiter site on POST /api/v1/newsletter/subscribe")?;
+    let subscribe_dims = dims_by_id[str_field(subscribe, "id", "site")?].clone();
+    let claimed: Vec<String> = arr_field(claim, "subscribe_limiter_dimensions", "claim")?.iter().filter_map(|x| x.str().map(str::to_owned)).collect();
+    ensure_eq("C-07 subscribe limiter dimensions vs the call site", claimed, subscribe_dims.clone())?;
+    ensure_eq("C-07 recipient-dimension sites", num_field(claim, "limiter_sites_with_a_recipient_dimension", "claim")?, recipient_sites)?;
+    let cooldown = control("newsletter-recipient-cooldown")?;
+    let setting = field(cooldown, "cooldown", "cooldown")?;
+    check_setting(&files, setting, "newsletter cooldown")?;
+    ensure_eq("cooldown env", setting.get("env").and_then(Json::str), Some("NEWSLETTER_CONFIRMATION_COOLDOWN_SEC"))?;
+    let mut enforced = Vec::new();
+    for f in arr_field(cooldown, "enforced_by", "cooldown")? {
+        enforced.push((str_field(f, "path", "cooldown")?.to_owned(), num_field(f, "line", "cooldown")? as usize, str_field(f, "anchor", "cooldown")?.to_owned()));
+    }
+    let at = |needle: &str| enforced.iter().find(|(_, _, a)| a.contains(needle)).map(|(_, l, _)| *l).ok_or(format!("cooldown: {needle} is not cited"));
+    let conflict = at("ON CONFLICT (tenant_id, email_normalized) DO UPDATE")?;
+    let predicate = at("confirmation_sent_at IS NULL")?;
+    let interval = at("make_interval(secs => ${confirmationCooldownSeconds})")?;
+    ensure(conflict < predicate && predicate < interval && interval - conflict < 40, "cooldown: the cooldown predicate is not inside the ON CONFLICT ... DO UPDATE statement")?;
+    let confirmed = subscribe_dims == ["client_ip"] && recipient_sites == 0;
+    ensure_eq("C-07 verdict recomputed", str_field(claim, "verdict", "claim")?, if confirmed { "confirmed" } else { "not-confirmed" })?;
+    let comparison = field(claim, "comparison_password_forgot", "claim")?;
+    let forgot = sites.iter().find(|s| s.get("route").and_then(Json::str) == Some("/api/v1/auth/password/forgot")).ok_or("no limiter site on POST /api/v1/auth/password/forgot")?;
+    let forgot_dims: Vec<String> = dims_by_id[str_field(forgot, "id", "site")?].clone();
+    let claimed_forgot: Vec<String> = arr_field(comparison, "limiter_dimensions", "claim")?.iter().filter_map(|x| x.str().map(str::to_owned)).collect();
+    ensure_eq("C-07 forgot-password dimensions vs the call site", claimed_forgot, forgot_dims)?;
+    let words = nonempty_strs(comparison, "cooldown_words_searched", "claim")?;
+    let mut hits = 0usize;
+    files.with("src/modules/identity-access/application/password-reset.ts", |lines| {
+        for line in lines.iter().filter(|l| is_code_line(l)) {
+            for w in &words {
+                if line.to_lowercase().contains(w.as_str()) {
+                    hits += 1;
+                }
+            }
+        }
+    })?;
+    ensure_eq("C-07 cooldown-word hits recounted", arr_field(comparison, "cooldown_word_hits_in_password_reset_module", "claim")?.len(), hits)?;
+    Ok(())
+}
+
+// ------------------------------------------------------- credential formats ----
+
+const CREDENTIAL_WORDS: [&str; 11] = ["secret", "token", "password", "api_key", "credential", "verifier", "nonce", "passphrase", "private_key", "code_hash", "state_hash"];
+
+fn storage_class(column: &str) -> &'static str {
+    if column.contains("ciphertext") || column.contains("encrypted") {
+        "encrypted"
+    } else if column.contains("hash") {
+        "hash"
+    } else if column.ends_with("_env_var") {
+        "env-var-name"
+    } else {
+        "plaintext-candidate"
+    }
+}
+
+fn sql_table_of(line: &str) -> Option<String> {
+    let t = line.trim_start();
+    let rest = t.strip_prefix("CREATE TABLE").or_else(|| t.strip_prefix("ALTER TABLE"))?;
+    let name = rest.split_whitespace().find(|w| !matches!(*w, "IF" | "NOT" | "EXISTS" | "ONLY"))?;
+    Some(name.trim_end_matches('(').to_owned())
+}
+
+/// (file, line, table, column, storage) of credential-like text columns.
+fn recount_columns(files: &ImplFiles) -> Result<Vec<(String, usize, String, String, String)>, String> {
+    let mut out = Vec::new();
+    for path in files.paths("sql/")? {
+        files.with(&path, |lines| {
+            let mut table = String::new();
+            for (index, line) in lines.iter().enumerate() {
+                if let Some(name) = sql_table_of(line) {
+                    table = name;
+                }
+                let t = line.trim_start();
+                if t.starts_with("--") {
+                    continue;
+                }
+                let body = t.strip_prefix("ADD COLUMN IF NOT EXISTS ").or_else(|| t.strip_prefix("ADD COLUMN ")).unwrap_or(t);
+                let mut words = body.split_whitespace();
+                let (Some(name), Some(ty)) = (words.next(), words.next()) else { continue };
+                let ty = ty.trim_end_matches([',', ';']);
+                let simple = !name.is_empty() && name.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_');
+                let textual = ty == "text" || ty == "bytea" || ty.starts_with("varchar") || ty.starts_with("character");
+                if simple && textual && CREDENTIAL_WORDS.iter().any(|w| name.contains(w)) {
+                    out.push((path.clone(), index + 1, table.clone(), name.to_owned(), storage_class(name).to_owned()));
+                }
+            }
+        })?;
+    }
+    Ok(out)
+}
+
+/// Whether a comment line naming the column, or the one after it, says PLAINTEXT.
+fn says_plaintext(files: &ImplFiles, path: &str, column: &str) -> Result<bool, String> {
+    files.with(path, |lines| {
+        let needle = format!("`{column}`");
+        lines.iter().enumerate().any(|(i, l)| {
+            l.trim_start().starts_with("--")
+                && l.contains(&needle)
+                && (l.to_lowercase().contains("plaintext") || lines.get(i + 1).is_some_and(|n| n.trim_start().starts_with("--") && n.to_lowercase().contains("plaintext")))
+        })
+    })
+}
+
+fn column_key(d: &Json, file: &str) -> Result<(String, usize, String, String, String), String> {
+    let fact = field(d, "fact", "column")?;
+    ensure_eq("column fact path", str_field(fact, "path", "column")?, file)?;
+    Ok((file.to_owned(), num_field(fact, "line", "column")? as usize, str_field(d, "table", "column")?.to_owned(), str_field(d, "column", "column")?.to_owned(), str_field(d, "storage", "column")?.to_owned()))
+}
+
+/// A column the artifact names must exist among the recomputed columns with the expected storage class.
+fn stored_in_ok(stores: &[Json], known: &[(String, usize, String, String, String)], storage: &str, what: &str) -> R {
+    ensure(!stores.is_empty(), format!("{what}: stored_in is empty"))?;
+    for s in stores {
+        let table = str_field(s, "table", what)?;
+        let column = str_field(s, "column", what)?;
+        let hit = known.iter().find(|k| k.2 == table && k.3 == column).ok_or(format!("{what}: {table}.{column} is not a credential column of the frozen migrations"))?;
+        ensure_eq(&format!("{what}: {table}.{column} storage"), hit.4.as_str(), storage)?;
+        ensure_eq(&format!("{what}: {table}.{column} storage as recorded"), str_field(s, "storage", what)?, storage)?;
+    }
+    Ok(())
+}
+
+/// A secret must never enter the artifact: no PHC string with a digest, no long
+/// hex run other than the pinned SHA, no key block.
+fn check_no_secret_material(text: &str, awcms_sha: &str) -> R {
+    ensure(!text.contains("-----BEGIN"), "credential-formats.json: contains a key block")?;
+    let mut rest = text;
+    while let Some(at) = rest.find("$argon2") {
+        let tail = &rest[at..];
+        let end = tail.find('"').unwrap_or(tail.len());
+        ensure(tail[..end].ends_with('$') && tail[..end].matches('$').count() == 4, format!("credential-formats.json: a PHC string carries more than its parameters: {}", &tail[..end.min(24)]))?;
+        rest = &tail[end..];
+    }
+    let mut run = String::new();
+    for ch in text.chars().chain(std::iter::once(' ')) {
+        if ch.is_ascii_hexdigit() {
+            run.push(ch);
+        } else {
+            ensure(run.len() < 32 || run == awcms_sha, format!("credential-formats.json: a hex run of {} characters (digest-like) is not the pinned SHA", run.len()))?;
+            run.clear();
+        }
+    }
+    Ok(())
+}
+
+fn check_credentials(c: &Ctx) -> R {
+    if !artifact_present(c, CREDENTIALS)? {
+        return Ok(());
+    }
+    ensure(artifact_present(c, IMPL_TREE)?, "credential-formats.json is present but the frozen implementation tree it cites is absent")?;
+    let p = provenance(c)?;
+    let raw = c.read(CREDENTIALS)?;
+    check_no_secret_material(&raw, &p.awcms)?;
+    let j = c.json(CREDENTIALS)?;
+    same_sha(&j, "source_sha", &p.awcms, "credential-formats.json")?;
+    let files = ImplFiles::new(c);
+    check_facts(&files, &j, "credential-formats.json")?;
+    check_impl_tree(c, &files)?;
+    ensure(!nonempty_strs(&j, "not_derivable_from_source", "credential-formats.json")?.is_empty(), "credential-formats.json: no statement of what is not derivable")?;
+
+    // Columns: recomputed from the frozen migrations, both ways.
+    let known = recount_columns(&files)?;
+    let listed = arr_field(&j, "credential_columns", "credential-formats.json")?;
+    let mut recorded = Vec::new();
+    for entry in listed {
+        recorded.push(column_key(field(entry, "detail", "column")?, str_field(entry, "file", "column")?)?);
+    }
+    ensure_eq("credential columns vs the frozen migrations", recorded, known.clone())?;
+    let summary = field(&j, "summary", "credential-formats.json")?;
+    ensure_eq("summary columns", num_field(summary, "columns", "summary")?, known.len() as u64)?;
+    let mut by_storage: BTreeMap<String, u64> = BTreeMap::new();
+    for k in &known {
+        *by_storage.entry(k.4.clone()).or_default() += 1;
+    }
+    let recorded_by: BTreeMap<String, u64> = match field(summary, "by_storage", "summary")? {
+        Json::Obj(items) => items.iter().filter_map(|(k, v)| v.num().map(|n| (k.clone(), n))).collect(),
+        _ => return Err("summary.by_storage is not an object".into()),
+    };
+    ensure_eq("summary by_storage", recorded_by, by_storage)?;
+
+    // Plaintext candidates: exactly the columns classified so, each with its comment verdict recomputed.
+    let candidates = arr_field(&j, "plaintext_candidates", "credential-formats.json")?;
+    let expected: Vec<&(String, usize, String, String, String)> = known.iter().filter(|k| k.4 == "plaintext-candidate").collect();
+    ensure_eq("plaintext candidates vs columns", candidates.len(), expected.len())?;
+    for (entry, k) in candidates.iter().zip(expected) {
+        let detail = field(entry, "detail", "plaintext candidate")?;
+        ensure_eq("plaintext candidate column", column_key(detail, str_field(entry, "file", "candidate")?)?, k.clone())?;
+        let says = says_plaintext(&files, &k.0, &k.3)?;
+        ensure_eq(&format!("{}.{}: comment_says_plaintext recomputed", k.2, k.3), matches!(field(detail, "comment_says_plaintext", "candidate")?, Json::Bool(true)), says)?;
+    }
+    let search = field(&j, "plaintext_password_column_search", "credential-formats.json")?;
+    ensure_eq("plaintext password column hits", arr_field(search, "hits", "search")?.len(), 0)?;
+
+    // Password.
+    let pw = field(&j, "password", "credential-formats.json")?;
+    ensure_eq("password algorithm", str_field(pw, "algorithm", "password")?, "argon2id")?;
+    let params = field(pw, "parameters", "password")?;
+    let (v, m, t, par) = (num_field(params, "version", "p")?, num_field(params, "memory_kib", "p")?, num_field(params, "iterations", "p")?, num_field(params, "parallelism", "p")?);
+    let prefix = format!("$argon2id$v={v}$m={m},t={t},p={par}$");
+    ensure_eq("dummy hash PHC prefix", str_field(field(pw, "dummy_hash", "password")?, "phc_prefix", "password")?, prefix.as_str())?;
+    let phc_fact = &arr_field(params, "facts", "parameters")?[0];
+    ensure(files.line(str_field(phc_fact, "path", "p")?, num_field(phc_fact, "line", "p")? as usize)?.contains(&prefix), "password parameters are not the PHC prefix on the cited line")?;
+    ensure(v >= 19 && m >= 19456 && t >= 2 && par >= 1, "password parameters are below the Argon2id floor this check enforces (v19, m 19456 KiB, t 2, p 1)")?;
+    stored_in_ok(arr_field(pw, "stored_in", "password")?, &known, "hash", "password")?;
+    ensure(!arr_field(pw, "verified_at", "password")?.is_empty() && !arr_field(pw, "hash_written_at", "password")?.is_empty(), "password: no verification or write site recorded")?;
+    for f in arr_field(pw, "verified_at", "password")? {
+        ensure(str_field(f, "anchor", "verified")?.contains("verifyPassword"), "password verified_at: anchor is not a verification call")?;
+    }
+    for f in arr_field(pw, "hash_written_at", "password")? {
+        ensure(str_field(f, "anchor", "written")?.contains("hashPassword("), "password hash_written_at: anchor is not a hash call")?;
+    }
+    for (key, patterns) in [("legacy_format_search", true), ("rehash_on_login_search", false)] {
+        let search = field(pw, key, "password")?;
+        let words = nonempty_strs(search, "patterns", key)?;
+        let mut hits = 0usize;
+        for path in files.paths("src/")? {
+            files.with(&path, |lines| {
+                for line in lines.iter().filter(|l| is_code_line(l)) {
+                    hits += words.iter().filter(|w| line.contains(w.as_str())).count();
+                }
+            })?;
+        }
+        ensure_eq(&format!("{key} hits recounted over the frozen files"), arr_field(search, "hits", key)?.len(), hits)?;
+        let _ = patterns;
+    }
+
+    // Bearer tokens.
+    let tokens = arr_field(&j, "bearer_tokens", "credential-formats.json")?;
+    let mut namespaces: BTreeMap<String, String> = BTreeMap::new();
+    let mut token_prefixes = Vec::new();
+    for tok in tokens {
+        let id = str_field(tok, "id", "token")?;
+        let hash = field(tok, "hash", id)?;
+        ensure_eq(&format!("{id}: hash algorithm"), str_field(hash, "algorithm", id)?, "SHA-256")?;
+        ensure_eq(&format!("{id}: digest encoding"), str_field(hash, "digest_encoding", id)?, "hex")?;
+        ensure(matches!(field(hash, "salted", id)?, Json::Bool(false)), format!("{id}: salted flag"))?;
+        let out_prefix = str_field(hash, "output_prefix", id)?;
+        if !out_prefix.is_empty() {
+            let mut shown = false;
+            for f in arr_field(hash, "facts", id)? {
+                shown |= files.line(str_field(f, "path", id)?, num_field(f, "line", id)? as usize)?.contains(out_prefix);
+            }
+            ensure(shown, format!("{id}: output prefix `{out_prefix}` is on no cited line"))?;
+            namespaces.insert(id.to_owned(), out_prefix.to_owned());
+        }
+        let stores = arr_field(tok, "stored_in", id)?;
+        stored_in_ok(stores, &known, "hash", id)?;
+        for s in stores {
+            if let Some(check) = s.get("format_check").filter(|x| **x != Json::Null) {
+                ensure_eq(&format!("{id}: database CHECK vs the prefix the code writes"), str_field(check, "pattern", id)?, format!("^{out_prefix}[0-9a-f]{{64}}$").as_str())?;
+            }
+        }
+        if let Some(g) = Some(field(tok, "generation", id)?).filter(|g| **g != Json::Null) {
+            ensure(num_field(g, "random_bytes", id)? >= 5, format!("{id}: random_bytes"))?;
+            ensure(["base64url", "base32"].contains(&str_field(g, "encoding", id)?), format!("{id}: encoding"))?;
+            if let Some(tp) = g.get("token_prefix").and_then(Json::str) {
+                token_prefixes.push(tp.to_owned());
+            }
+        }
+    }
+    for id in ["session-token", "machine-credential", "tenant-selection-token", "delegated-access-code", "session-handoff-code", "bff-client-secret"] {
+        ensure(namespaces.contains_key(id), format!("bearer token {id} is not recorded"))?;
+    }
+    // The six namespaces that route a bearer by its hash must not collide; the
+    // plain `sha256:` tag is shared on purpose by single-use tokens that are not bearers.
+    let routed: Vec<&String> = ["session-token", "machine-credential", "tenant-selection-token", "delegated-access-code", "session-handoff-code", "bff-client-secret"].iter().map(|id| &namespaces[*id]).collect();
+    let distinct: BTreeSet<&&String> = routed.iter().collect();
+    ensure_eq("bearer hash namespaces are distinct", distinct.len(), routed.len())?;
+    let distinct_tokens: BTreeSet<&String> = token_prefixes.iter().collect();
+    ensure_eq("token prefixes are distinct", distinct_tokens.len(), token_prefixes.len())?;
+    let reserved = files.with("src/lib/auth/session-token.ts", |lines| lines.join("\n"))?;
+    for name in ["MACHINE_CREDENTIAL_TOKEN_PREFIX", "PRINCIPAL_SELECTION_TOKEN_PREFIX", "DELEGATED_ACCESS_CODE_PREFIX"] {
+        ensure(reserved.contains(&format!("{name},")) || reserved.contains(&format!("  {name}\n")), format!("session-token.ts does not reserve {name}"))?;
+    }
+
+    // Encrypted secrets.
+    for cipher in arr_field(&j, "encrypted_secrets", "credential-formats.json")? {
+        let id = str_field(cipher, "id", "cipher")?;
+        ensure_eq(&format!("{id}: algorithm"), str_field(cipher, "algorithm", id)?, "aes-256-gcm")?;
+        ensure_eq(&format!("{id}: iv bytes"), num_field(cipher, "iv_bytes", id)?, 12)?;
+        ensure_eq(&format!("{id}: key bytes"), num_field(cipher, "key_bytes", id)?, 32)?;
+        ensure_eq(&format!("{id}: layout"), nonempty_strs(cipher, "layout", id)?.len(), 4)?;
+        stored_in_ok(arr_field(cipher, "stored_in", id)?, &known, "encrypted", id)?;
+    }
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 || args.len() > 3 {
@@ -1624,6 +2333,8 @@ fn main() -> ExitCode {
     c.check("gates", check_gates);
     c.check("routes", check_routes);
     c.check("behaviour-fixtures", check_behaviour);
+    c.check("rate-limits", check_rate_limits);
+    c.check("credential-formats", check_credentials);
     c.check("usage-map", check_usage_map);
     c.note("authorization vectors carry structured fields and cited tests; no parity harness executes them yet".into());
     for n in c.notes.borrow().iter() {
@@ -1698,6 +2409,46 @@ mod tests {
         assert!(artifact_present(&unlisted, "frozen/static/absent.json").is_err());
         assert_eq!(artifact_present(&mk(&["frozen/static/present.json"]), "frozen/static/present.json"), Ok(true));
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn route_naming_and_number_helpers() {
+        assert_eq!(route_of_file("src/pages/api/v1/a/[id]/index.ts").as_deref(), Some("/api/v1/a/[id]"));
+        assert_eq!(route_of_file("src/lib/x.ts"), None);
+        assert_eq!(lit_product("60 * 60 * 1000"), Some(3_600_000));
+        assert_eq!(lit_product("50_000"), Some(50_000));
+        assert_eq!(lit_product("X * 2"), None);
+        assert_eq!(number_tokens("maxAttempts: 5_000, windowMs: 900"), vec![5000, 900]);
+    }
+
+    #[test]
+    fn sql_columns_are_classified_by_name() {
+        assert_eq!(storage_class("token_hash"), "hash");
+        assert_eq!(storage_class("secret_ciphertext"), "encrypted");
+        assert_eq!(storage_class("client_secret_env_var"), "env-var-name");
+        assert_eq!(storage_class("code_verifier"), "plaintext-candidate");
+        assert_eq!(sql_table_of("CREATE TABLE IF NOT EXISTS awcms_x ("), Some("awcms_x".to_owned()));
+        assert_eq!(sql_table_of("ALTER TABLE ONLY awcms_y"), Some("awcms_y".to_owned()));
+        assert_eq!(sql_table_of("  id uuid"), None);
+    }
+
+    #[test]
+    fn secret_material_guard() {
+        let sha = "a".repeat(40);
+        assert!(check_no_secret_material("{\"p\": \"$argon2id$v=19$m=65536,t=2,p=1$\", \"s\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}", &sha).is_ok());
+        // Built from parts so no complete PHC string (salt and digest) sits in the source.
+        let with_digest = ["", "argon2id", "v=19", "m=65536,t=2,p=1", "c2FsdA", "ZGlnZXN0"].join("$");
+        assert!(check_no_secret_material(&format!("\"{with_digest}\""), &sha).is_err());
+        assert!(check_no_secret_material(&format!("\"{}\"", "0123456789abcdef".repeat(4)), &sha).is_err());
+        assert!(check_no_secret_material("-----BEGIN PRIVATE KEY-----", &sha).is_err());
+    }
+
+    #[test]
+    fn facts_are_found_anywhere_in_a_document() {
+        let j = parse_json(r#"{"a": [{"path": "p.ts", "line": 3, "anchor": "x"}], "b": {"c": {"path": "q.ts", "line": 1, "anchor": "y"}, "line": 9}}"#).unwrap();
+        let mut facts = Vec::new();
+        walk_facts(&j, &mut facts);
+        assert_eq!(facts, vec![("p.ts".to_owned(), 3, "x".to_owned()), ("q.ts".to_owned(), 1, "y".to_owned())]);
     }
 
     #[test]
