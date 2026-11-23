@@ -1,7 +1,7 @@
 {
   "gate": "VG-01",
-  "freezeSourceAwbmsCommit": "73bbcd2508c662df11cdd1bb0a03a0dbd9cfa90a",
-  "freezeWorkflowRunId": "33251696675",
+  "freezeSourceAwbmsCommit": "5d30256e8dfded4d5ac6f8bb86bdf241158314e9",
+  "freezeWorkflowRunId": "45102539207",
   "awcms": "11f2e95a47b1328a820f976d60f978c38a067903",
   "awcmsAstro": "7b753be619244541b817d5d8e7d3b72cfe88d4f9",
   "postgres": "18.6",
