@@ -320,7 +320,7 @@ Edition       : 2024
 Tokio         : single pinned minor line per release train
 ```
 
-> **[O] `OD-02`** — "supported/LTS line where practical", as originally written, is not an actionable policy: it names no cadence, no owner and no upgrade trigger. `OD-02` MUST define the pin granularity, the routine upgrade cadence, and the expedited path for a RustSec advisory, before CI is established (step 2 of [§51](#51-initial-implementation-sequence-after-definition-of-ready)).
+> **[D] `OD-02` — closed by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) (2026-11-23).** The toolchain and dependency policy is [Master Blueprint §10](AWBMS-MASTER-BLUEPRINT.md#10-toolchain-and-dependency-policy--od-02-decision): exact stable pin, committed lockfile, routine and upgrade review cadences, and an expedited RustSec path.
 
 Dependency upgrades MUST pass:
 
@@ -1232,7 +1232,7 @@ error rate
 
 Use identical infrastructure, dataset and workload when comparing AWCMS and AWBMS. A comparison that varies infrastructure alongside implementation measures nothing.
 
-**[O] `OD-04`** — no acceptance threshold is defined for any metric above. "Benchmark improves a defined metric" ([§48](#48-performance-validation-gates)) is unenforceable until targets exist. The Blueprint MUST set, per benchmark scenario, an explicit SLO or a "baseline-only, no regression beyond X%" rule. Until then `VG-09` verifies only that measurements were *taken*, not that they were *acceptable*.
+**[D] `OD-04` — closed by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) (2026-11-23).** Acceptance is the baseline-first no-regression policy of [Master Blueprint §11](AWBMS-MASTER-BLUEPRINT.md#11-performance-policy--od-04-decision), per metric and scenario. Absolute targets remain open under `OD-06`; until then `VG-09` judges results only against an approved baseline.
 
 Correctness and security parity come before performance optimization; a faster implementation that fails `VG-05` or `VG-12` is not a candidate for cutover.
 
@@ -1610,7 +1610,7 @@ Once migration and compatibility windows are complete, it can be deprecated inde
 
 Because AWBMS is a separate product, more than one migration mode is defensible. This section describes three; [§37.3](#373-preferred-long-term-approach) is preferred.
 
-> **[O] `OD-01` — the choice is open and it is consequential.** The three modes below are *not* interchangeable: §37.1 forces schema-name compatibility and expand-contract coexistence ([§40.1](#401-expand-contract-rule)) onto every migration, §37.2 forgoes coexistence on one database entirely, and §37.3 requires a reconciliation pipeline that neither of the others needs. Sequencing, rollback design ([§42](#42-rollback-model)) and the parity harness scope ([§39](#39-awcms--awbms-parity-harness)) all depend on which is chosen. `OD-01` MUST be closed in the Master Blueprint, per deployment, with the choice and its rationale recorded as a successor decision to `AD-27`. Do not begin migration engineering while all three remain open.
+> **[D] `OD-01` — closed by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) (2026-11-23), as the successor decision to `AD-27`.** The default mode for every deployment is §37.3, deterministic migration into an AWBMS-native schema, per [Master Blueprint §9](AWBMS-MASTER-BLUEPRINT.md#9-migration-strategy--od-01-decision). A deployment needing §37.1 or §37.2 records that exception in its own ADR. The three modes remain non-interchangeable, which is why the exception path is explicit.
 
 ### 37.1 Existing AWCMS production database takeover
 
@@ -2448,19 +2448,19 @@ The authoritative decision list. `AD-01`–`AD-30` were made by the original val
 
 An open decision must not be resolved silently in prose or in implementation code. Closing one means recording a decision with its rationale, as a new `AD-` row or an ADR.
 
-Six of the nine block Blueprint sign-off ([§49.1](#491-entry-conditions) condition 2). The other three block later stages and are listed here so they are not rediscovered as surprises.
+Six of the nine blocked Blueprint sign-off ([§49.1](#491-entry-conditions) condition 2). As of 2026-11-23, `OD-01`, `OD-04` and `OD-09` are closed by ADR-0006, so three blocking entries remain: `OD-03`, `OD-05`, `OD-06`. Of the three that block later stages, `OD-02` (ADR-0006) and `OD-08` (ADR-0005) are closed and `OD-07` remains open.
 
 | ID | Question | Why it is open | Decision criteria | Blocks | Owner |
 |---|---|---|---|---|---|
-| `OD-01` | Which migration mode: takeover of the AWCMS production database, a new AWBMS-native deployment, or deterministic migration into a native schema? | The three modes are not interchangeable. Takeover forces schema-name compatibility and expand-contract on every migration; a new deployment forgoes coexistence entirely; native migration needs a reconciliation pipeline neither other mode requires | Per deployment, weighing coexistence duration, downtime tolerance and reconciliation cost. `AD-27` is the successor decision to record | **Blueprint sign-off.** Do not begin migration engineering while all three remain open | *unassigned* |
-| `OD-02` | What is the dependency and toolchain upgrade policy? | "Supported/LTS line where practical" names no cadence, no owner and no upgrade trigger, so it is not actionable | Must define pin granularity, routine upgrade cadence, and an expedited path for a RustSec advisory | CI establishment, [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 2 | *unassigned* |
+| `OD-01` | Which migration mode: takeover of the AWCMS production database, a new AWBMS-native deployment, or deterministic migration into a native schema? | **Closed 2026-11-23 by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md):** deterministic migration into an AWBMS-native schema is the default ([Blueprint §9](AWBMS-MASTER-BLUEPRINT.md#9-migration-strategy--od-01-decision)); other modes need a per-deployment ADR | — | No longer blocks Blueprint sign-off | Repository owner |
+| `OD-02` | What is the dependency and toolchain upgrade policy? | **Closed 2026-11-23 by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md):** [Blueprint §10](AWBMS-MASTER-BLUEPRINT.md#10-toolchain-and-dependency-policy--od-02-decision) | — | No longer blocks [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 2 | Repository owner |
 | `OD-03` | Which AWCMS credential formats, session shapes and legacy contracts must AWBMS accept? | Cannot be answered from this document; it depends on what `VG-01` finds in the implementation | Scope chosen against migration risk and the cost of carrying compatibility surface | **Blueprint sign-off.** Determines `AD-26` harness scope and [§36](#36-awcms-compatibility-architecture) surface | *unassigned* |
-| `OD-04` | What are the acceptance thresholds for each benchmark scenario? | No threshold is defined for any metric, so "benchmark improves a defined metric" ([§48](#48-performance-validation-gates)) is unenforceable | Per scenario: an explicit SLO, or a "baseline-only, no regression beyond X%" rule. Depends on `OD-06` | **Blueprint sign-off.** Until closed, `VG-09` verifies only that measurements were taken, not that they were acceptable | *unassigned* |
+| `OD-04` | What are the acceptance thresholds for each benchmark scenario? | **Closed 2026-11-23 by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md):** baseline-first no-regression thresholds ([Blueprint §11](AWBMS-MASTER-BLUEPRINT.md#11-performance-policy--od-04-decision)); absolute targets stay with `OD-06` | — | No longer blocks Blueprint sign-off | Repository owner |
 | `OD-05` | How many deployments exist, and are tenants separated by deployment or only by tenant ID within one? | Determines what tenant isolation means operationally as well as in SQL | Product and commercial requirements, weighed against operational cost per deployment | **Blueprint sign-off** | *unassigned* |
 | `OD-06` | What are the SLO targets per capability? | [§49.2](#492-blueprint-contents) lists SLOs as Blueprint content; none exists. `OD-04` cannot set thresholds without them | Availability, latency and durability targets per capability class | **Blueprint sign-off** | *unassigned* |
 | `OD-07` | Does search stay in PostgreSQL (`tsvector`/GIN/`pg_trgm`) or move to a dedicated index? | Changes whether search is a microservice extraction candidate at all ([§8.2](#82-microservice-extraction-rule)), and changes the data lifecycle surface | Corpus size, query shape and relevance requirements, measured | First module implementation requiring search, [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 24 | *unassigned* |
 | `OD-08` | What licence does AWBMS carry, and what dependency licence allow-list applies? | **Closed 2026-11-23 by [ADR-0005](../adr/0005-licence-mit-and-dependency-licence-allow-list.md):** MIT for AWBMS; permissive dependency allow-list in `deny.toml` | — | No longer blocks [§51](#51-initial-implementation-sequence-after-definition-of-ready) step 2 or `cargo-deny` | Repository owner |
-| `OD-09` | What is the AWBMS v1 module scope? | The 24 AWCMS modules of `C-02` are an inventory, not a commitment. Treating them as scope would make v1 a full reimplementation by default | Product priority against migration risk, module by module | **Blueprint sign-off** | *unassigned* |
+| `OD-09` | What is the AWBMS v1 module scope? | **Closed 2026-11-23 by [ADR-0006](../adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md):** 16 capabilities in v1, 8 remain in AWCMS, waves 0–4 ([Blueprint §8](AWBMS-MASTER-BLUEPRINT.md#8-awbms-v1-scope--od-09-decision)) | — | No longer blocks Blueprint sign-off | Repository owner |
 
 ## Appendix E — Verification gate register
 
@@ -2480,7 +2480,7 @@ Read the passes for what they are. `VG-03` and `VG-04` establish that the chosen
 | `VG-06` | Tenant isolation and RLS evidence | RLS test results, `pg_class`/`pg_policy` introspection, role privilege assertions | `tests/rls/` | Cross-tenant access denied at all three layers ([§11.2](#112-tenant-security)); `awbms_app` confirmed `NOBYPASSRLS` and non-owner | **Open** |
 | `VG-07` | Authorization chokepoint coverage | Route-to-authorization mapping; decision log samples | Static check that every protected route passes the chokepoint | No protected operation bypasses it; no undocumented exception | **Open** |
 | `VG-08` | Contract conformance | OpenAPI and AsyncAPI documents plus the implemented route table | `tests/contract/` | Every implemented route specified and every specified route implemented or explicitly planned; unique `operationId`; error envelope consistent | **Open** |
-| `VG-09` | Performance validation | Benchmark results over the [§23.1](#231-required-benchmark-corpus) corpus | Benchmark harness | Measurements taken on identical infrastructure, dataset and workload. **Acceptability is not assessed until `OD-04` closes** | **Open.** No benchmark designed or run |
+| `VG-09` | Performance validation | Benchmark results over the [§23.1](#231-required-benchmark-corpus) corpus | Benchmark harness | Measurements taken on identical infrastructure, dataset and workload. **Acceptability is judged by the no-regression policy of `OD-04` (closed, ADR-0006); absolute targets wait for `OD-06`** | **Open.** No benchmark designed or run |
 | `VG-10` | Migration ledger integrity | Migration history table and per-file checksums | Migration runner startup check | Applied migration contents immutable by checksum; cross-process lock demonstrated | **Open** |
 | `VG-11` | Idempotency and concurrency evidence | Duplicate-request, parallel-update, job-claim and event-dispatch test results | `tests/concurrency/` | One committed business effect per idempotency key; no double-processing of jobs or events | **Open** |
 | `VG-12` | Recovery and rollback evidence | Rehearsal record per migration wave | Restore test against a production-like snapshot | Recovery point verified and rollback executed successfully **before** the wave deploys | **Open** |
@@ -2505,13 +2505,13 @@ Stage 1 may begin immediately; Blueprint authoring is itself the work that close
 | Condition | State at v0.3.0 |
 |---|---|
 | 1 — `VG-01` discharged, superseding `C-01`–`C-05` and `C-07` | **Partial.** `C-01`, `C-02`, `C-03` confirmed; `C-04`, `C-05`, `C-07` still unverified — the per-gate enforced/advisory/absent determination is the outstanding work |
-| 2 — every Blueprint-blocking open decision closed | 0 of 6 closed |
+| 2 — every Blueprint-blocking open decision closed | 3 of 6 closed (`OD-01`, `OD-04`, `OD-09` by ADR-0006); `OD-03`, `OD-05`, `OD-06` open |
 | 3 — every assumption confirmed or its dependent decision revisited | 1 of 8. `AS-03` is discharged in practice — the inventory freeze required exactly the access it assumes |
 | 4 — `VG-03` and `VG-04` discharged | **Met.** Both PASS |
 | 5 — `C-06` removed rather than carried forward | **Met.** Superseded by `rust-toolchain.toml` and `Cargo.lock` |
-| 6 — AWBMS v1 module scope defined (`OD-09`) | Open |
+| 6 — AWBMS v1 module scope defined (`OD-09`) | **Met.** `OD-09` closed by ADR-0006 (Blueprint §8) |
 
-Two of six conditions are met and a third is partial. **Stage 1 remains `IN PROGRESS`**, consistent with `AWBMS-STAGE-1-GATES.md`: the Blueprint cannot be signed off while `VG-01` is partial and six Blueprint-blocking open decisions stand.
+Three of six conditions are met (4, 5, 6) and two are partial (1, 2). **Stage 1 remains `IN PROGRESS`**, consistent with `AWBMS-STAGE-1-GATES.md`: the Blueprint cannot be signed off while `VG-01` is partial and three Blueprint-blocking open decisions (`OD-03`, `OD-05`, `OD-06`) stand.
 
 If condition 1 falsifies a material claim — for example if the `C-04`/`C-05` gates prove advisory rather than enforced — this validation MUST be revised before the Blueprint proceeds, not patched inside it.
 

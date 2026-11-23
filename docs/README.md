@@ -39,6 +39,8 @@ trusted.
 | [ADR-0003 — Documentation correctness is an executable gate](adr/0003-executable-documentation-gate.md) | Accepted |
 | [ADR-0004 — Adopt product development flow v2.0.0](adr/0004-adopt-product-development-flow-v2.md) | Accepted |
 | [ADR-0005 — License AWBMS under MIT and enforce a dependency licence allow-list](adr/0005-licence-mit-and-dependency-licence-allow-list.md) | Accepted |
+| [ADR-0006 — Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09](adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accepted |
+| [ADR-0007 — Keep the VG-01 legacy baseline pinned for Stage 1](adr/0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Accepted |
 | [ADR template](adr/TEMPLATE.md) | — |
 
 ### Versioning
@@ -93,7 +95,7 @@ These are absences, recorded so that nobody mistakes them for oversights.
 | AWCMS inventory frozen and consumed by checks, but `VG-01` still **partial** — gate classification, executable authorization harness, route ownership inventory and behaviour fixtures missing ([coverage note](architecture/evidence/VG-01-executable-coverage-2026-11-23.md)) | a `vg01-freeze` run and parity-harness work | `VG-01` |
 | No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–3 and 5–8 | §49.2, `OD-06` |
 | No AWBMS application module — the workspace holds only `crates/verification` | Blueprint sign-off, §51 step 10 | `VG-02` |
-| No performance baseline for AWBMS or AWCMS | benchmark corpus, §23.1 | `VG-09`, `OD-04` |
+| No performance baseline for AWBMS or AWCMS (acceptance policy decided: no-regression, ADR-0006) | benchmark corpus, §23.1 | `VG-09`, `OD-06` |
 | No approver named on the architecture validation | an owner accepting the conditional approval | Appendix F |
 
 Licensing is decided by [ADR-0005](adr/0005-licence-mit-and-dependency-licence-allow-list.md): AWBMS is MIT
