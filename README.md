@@ -24,11 +24,11 @@ What exists is Stage 1 groundwork:
 - the [Master Blueprint](docs/architecture/AWBMS-MASTER-BLUEPRINT.md) and
   [Stage 1 gates](docs/architecture/AWBMS-STAGE-1-GATES.md);
 - a **frozen AWCMS inventory** under `contracts/legacy/awcms/frozen/`, pinned to
-  source commits with SHA-256 manifests (`VG-01`, partial);
+  source commits with SHA-256 manifests (`VG-01` — PASS);
 - a **Rust verification spike** in `crates/verification` proving Axum, Tokio,
   SQLx and FORCE RLS compose as assumed (`VG-03`, `VG-04` — both PASS).
 
-Four of sixteen gates pass; one is partial; eleven are open. **No gate covering
+Five of sixteen gates pass; eleven are open. **No gate covering
 AWBMS behaviour has passed** — parity, performance and rollback are all open.
 Read §0 before §1.
 
@@ -98,8 +98,8 @@ Rust-native mechanisms.
 This repository has no source or runtime dependency on AWCMS, and must not
 acquire one. Compatibility is asserted only through frozen, provenance-stamped
 fixtures under `contracts/legacy/awcms/`, each stamped with the AWCMS commit it
-was taken from. That directory now exists and is populated; `VG-01` is partial,
-not discharged.
+was taken from. That directory now exists and is populated; `VG-01` passed on 2026-11-23
+(an inventory baseline, not parity).
 
 ## Licence
 

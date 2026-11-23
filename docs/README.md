@@ -75,13 +75,13 @@ and used across all documents:
 | `[G]` | It names the evidence that would settle the matter | A gate reference is not a passed gate |
 
 The most important thing to understand about this documentation set: of sixteen
-verification gates, **four pass, one is partial, and eleven are open.**
+verification gates, **five pass and eleven are open.**
 
 - `VG-03`, `VG-04` — the Rust stack composes as assumed. Real evidence, narrow scope.
 - `VG-15`, `VG-16` — standing structural conditions checked on every commit. They
   say nothing about whether an architectural claim is true.
-- `VG-01` — **partial**. The AWCMS inventory is frozen and confirms `C-01`–`C-03`;
-  `C-04`, `C-05` and `C-07` remain unverified.
+- `VG-01` — **PASS** (2026-11-23). The AWCMS inventory is frozen, consumed by checks,
+  and confirms `C-01`–`C-05` and `C-07` ([record](architecture/evidence/VG-01-PASS-2026-11-23.md)). An inventory, not parity.
 
 **No gate covering AWBMS behaviour has passed.** Parity, performance and rollback
 are all open, and no AWBMS module exists to test.
@@ -92,7 +92,7 @@ These are absences, recorded so that nobody mistakes them for oversights.
 
 | Gap | Blocked on | Tracked as |
 |---|---|---|
-| AWCMS inventory frozen and consumed by checks, but `VG-01` still **partial** — gate classification, executable authorization harness, route ownership inventory and behaviour fixtures missing ([coverage note](architecture/evidence/VG-01-executable-coverage-2026-11-23.md)) | a `vg01-freeze` run and parity-harness work | `VG-01` |
+| No AWCMS parity corpus: request/response body fixtures and an executing authorization-vector harness | an AWBMS HTTP runtime (after gate 9) | `VG-05` |
 | No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–3 and 5–8 | §49.2, `OD-06` |
 | No AWBMS application module — the workspace holds only `crates/verification` | Blueprint sign-off, §51 step 10 | `VG-02` |
 | No performance baseline for AWBMS or AWCMS (acceptance policy decided: no-regression, ADR-0006) | benchmark corpus, §23.1 | `VG-09`, `OD-06` |

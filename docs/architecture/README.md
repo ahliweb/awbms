@@ -10,7 +10,7 @@
 | [Invariant traceability](AWBMS-INVARIANT-TRACEABILITY.md) | AWCMS invariant → AWBMS control → automated check |
 | [`gates.json`](gates.json) | Machine-readable gate register; `scripts/check-docs.sh` keeps the Stage 1 table and Appendix E statuses equal to it |
 | [Pre-production evidence specification](AWBMS-PRE-PRODUCTION-EVIDENCE.md) | CI invariant gates required before surfaces expand, and the evidence shape of `VG-05`/`VG-09`/`VG-12`. Specification only |
-| [`evidence/`](evidence/) | Dated gate evidence records: `VG-01` static pipeline, executable coverage, baseline delta and publication procedure; `VG-03`/`VG-04`; main verification run |
+| [`evidence/`](evidence/) | Dated gate evidence records: `VG-01` PASS record, static pipeline, executable coverage, baseline delta and publication procedure; `VG-03`/`VG-04`; main verification run |
 
 > **Two gate registers exist; their status columns are checked, not trusted.**
 > Appendix E of the validation and `AWBMS-STAGE-1-GATES.md` both carry gate

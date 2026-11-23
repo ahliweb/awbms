@@ -28,7 +28,7 @@ Architecture [#30](https://github.com/ahliweb/awbms/issues/30); Stage 1 [#1](htt
 6. Restore/rollback rehearsal required before cutover.
 
 ## Proposed checks and test evidence
-Preserve VG-01 partial, VG-03/04 passed, VG-05/09/12 pending, VG-15 independence; use `scripts/check-docs.sh`. No unmeasured performance claim.
+Preserve the gate statuses recorded in `docs/architecture/gates.json` (VG-05/09/12 open) and VG-15 independence; use `scripts/check-docs.sh`. No unmeasured performance claim.
 
 ## Rollout / handoff
 Only Stage-1 documents and tests; reject creation of new Rust IDE service unless a separate measured business case and ADR exists.
