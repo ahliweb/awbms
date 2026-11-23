@@ -49,12 +49,18 @@ Every frozen artifact MUST record:
 contracts/legacy/awcms/
 ├── README.md
 ├── manifest.json            # VG-01 artifact register
-├── fixture-usage.json       # every frozen file → the check that consumes it
+├── fixture-usage.json       # every frozen file → the check that consumes it; pendingArtifacts
 ├── authorization/
-│   └── vectors.json         # authorization vectors (prose input/expected)
+│   └── vectors.json         # authorization vectors: prose plus structured, cited fields
 └── frozen/
     ├── provenance.json      # pinned AWCMS / AWCMS-Astro SHAs, toolchain
     ├── static/              # deterministic source inventory + pinned source copies
+    │   ├── modules.json, migrations.json, astro-consumer.json
+    │   ├── gates.json             # generated; frozen by the next vg01-freeze run
+    │   ├── routes.json            # generated; frozen by the next vg01-freeze run
+    │   ├── behaviour-fixtures.json  # generated; frozen by the next vg01-freeze run
+    │   └── source/                # pinned copies (OpenAPI, AsyncAPI, CI, package.json, ...)
+    │       └── tests/awcms/       # cited AWCMS test files (generated; same freeze run)
     └── live/                # controlled live PostgreSQL RLS / role introspection
 ```
 
@@ -62,19 +68,37 @@ Frozen files are published only through the `vg01-freeze` workflow
 (generation with a read-only token, publication by pull request), and
 `tools/vg01_verify_frozen.sh` fails CI on any orphan fixture or stale source SHA.
 
-## What is NOT yet proven
+### Pending artifacts
+
+`tools/vg01_inventory.rs` already generates `gates.json`, `routes.json`,
+`behaviour-fixtures.json` and the cited test copies, and
+`tools/vg01_check_corpus.rs` already validates them, but they are not committed
+until the `vg01-freeze` workflow runs. Until then `fixture-usage.json` lists
+them in `pendingArtifacts`: an absent pending artifact is a note, a present one
+must validate and must be mapped, and the freeze workflow's own verification
+therefore already enforces them. **The freeze pull request empties
+`pendingArtifacts`** (after which absence is a failure). `verification.yml`
+also checks, on every pull request, that the checker accepts the freshly
+generated output (`tools/vg01_check_generated.sh`).
+
+## What will be proven once the freeze pull request lands
 
 This README does not discharge `VG-01`; the gate is **PARTIAL** in the
 [Stage 1 gate register](../../../docs/architecture/AWBMS-STAGE-1-GATES.md). The
 per-criterion state is in
 [`VG-01-executable-coverage-2026-11-23.md`](../../../docs/architecture/evidence/VG-01-executable-coverage-2026-11-23.md).
+
+Closed by the generator and checker extension (frozen by the next `vg01-freeze` run):
+
+- an AWCMS gate inventory classified as enforced / advisory / absent, each entry citing its source (`gates.json`);
+- a complete route inventory with owning module and auth classification, counts reconciled with the repo inventory and the frozen OpenAPI (`routes.json`);
+- structured authorization vectors (actor, credential, tenant relation, operation, expected decision/status, cited test) whose citations resolve to frozen test copies;
+- per-file migration SHA-256 recomputed from the SQL on every pull request (`tools/vg01_verify_migrations.sh`; effective as soon as the change merges, independent of the freeze).
+
 Still missing:
 
-- an AWCMS gate inventory classified as enforced / advisory / absent (only the raw CI and package files are frozen);
-- an executable harness for the authorization vectors (they are frozen as prose);
-- a complete route inventory with owning module and auth classification (only counts are frozen);
-- representative request/response behaviour fixtures for parity tests;
-- per-file migration SHA-256 checked against the SQL itself (needs the pinned AWCMS checkout, i.e. a `vg01-freeze` run).
+- request/response body fixtures: the pinned source holds no body examples and no recorded responses, so `behaviour-fixtures.json` carries operation-level contracts and test-asserted status/error-code exchanges only;
+- a parity harness that executes the structured vectors (AWBMS has no HTTP runtime to run them against, and several cited tests are static-source assertions rather than requests).
 
 Static repository inventory is not a substitute for live database evidence where the gate requires live state.
 

@@ -118,3 +118,41 @@ workflow or a separate reviewed import, not here.
 - Regenerating the frozen corpus through `vg01-freeze` will fail
   `check:usage-map` if the set of frozen files changes until
   `fixture-usage.json` is updated. That is intended.
+
+## Follow-up: generator and checker extension for the five open criteria
+
+A later change extends `tools/vg01_inventory.rs` and `tools/vg01_check_corpus.rs`
+for the five criteria this note marks NOT MET (and the migration limit under
+criterion 5). It commits no generated corpus: the new frozen files come from the
+next `vg01-freeze` run, and the baseline is **not** refreshed (pins stay
+`11f2e95a47b1328a820f976d60f978c38a067903` and
+`7b753be619244541b817d5d8e7d3b72cfe88d4f9`; the baseline-delta note records why).
+Verdict columns describe the state after that freeze run; nothing here is PASS.
+
+| Issue `#3` item | Added | After the freeze run |
+|---|---|---|
+| Gate inventory enforced / advisory / absent | `gates.json`: 82 entries (71 enforced, 4 advisory, 7 absent) from AWCMS `.github/workflows/*.yml`, `package.json` scripts, `scripts/` and docs; every entry cites its source. Validated by `check:gates` against the frozen `package.json` and `ci.yml`. | MET, with limits below |
+| Route inventory with owner and auth class | `routes.json`: 388 route files (308 / 50 / 30, equal to the frozen inventory), 483 handlers, owner from module `api.routes`, `PLATFORM_ROUTES`, navigation and `CORE_NAV_ENTRIES`, auth class from code markers. Validated by `check:routes`, including a recomputation of OpenAPI agreement from the frozen OpenAPI. | MET, with limits below |
+| Executable authorization vectors | `authorization/vectors.json` keeps ids and prose and gains a `structured` block per vector (actor, credential class, tenant relation, operations, decision, status, test kind, cited test and name). Validated immediately by `check:vectors`; citations into the new frozen test copies resolve after the freeze. | Machine-readable and cited: MET. Executed by a harness: NOT MET |
+| Representative request/response fixtures | `behaviour-fixtures.json`: 399 OpenAPI operation contracts (security, request schema, response statuses), 8 test-asserted exchanges (method, path, literal status, error code, cited test line), and an explicit list of classes with no source. | NOT MET for bodies; operation-level contracts only |
+| Migration SHA-256 against the SQL | `tools/vg01_verify_migrations.sh`, run in the Rust job of `verification.yml` against the pinned checkout (both the frozen and the freshly generated `migrations.json`). | MET once merged (does not need the freeze) |
+
+### How each classification is derived
+
+- **Gates.** Statuses come from files, never prose. `enforced`: reached, directly or through `bun run` chains (the `check` script expands to 63 distinct scripts), by a workflow job that triggers on `pull_request` or a branch push. `advisory`: a gate-like script that only release or manual workflows run, or that no workflow runs. `absent`: a doc names a check (`bun run X` or a script file) that does not exist at the pinned commit. Not derivable from source: whether branch protection makes a job *required* (a repository setting), and invariants that no document names as a command.
+- **Routes.** Session-free body endpoints come from AWCMS's own `SESSION_FREE_BODY_ENDPOINTS` registry; `machine-credential` from `verifySyncHeaders` and `defineClientCredentialTenantRoute`; `session` from `authorizeInTransaction`, the tenant-route factories, or a hand-written 401 `AUTH_REQUIRED` path; `admin` from the `/admin` middleware prefix. 392 of 399 OpenAPI-documented handlers agree with the frozen OpenAPI `security`; the 5 that differ carry the registry's reason (enrolment token, locale cookie, retired 410 endpoints); 2 stay `indeterminate` (optional-session reads: `GET /api/v1/comments`, `GET /api/v1/auth/sso/{providerKey}/start`); 4 `OPTIONS` preflights are not in the OpenAPI.
+- **Fixtures.** The bundled OpenAPI holds 5 scalar property `example:` values and 0 `examples:` blocks, and the pinned tree holds no recorded traffic, so those classes are listed as not available rather than invented. The AWCMS-Astro contract test (16 `fetch` mocks) is available by reference as an already-frozen file.
+
+### Verification performed
+
+- Generator run twice against the pinned checkouts: `diff -ru` empty (deterministic); the pre-existing static files are byte-identical to the committed corpus.
+- Checker run on the real generated tree assembled as a post-freeze corpus (`tools/vg01_check_generated.sh`): 17 checks pass, `pendingArtifacts` emptied; also passes with the artifacts present and still listed pending (the freeze job's state).
+- Corrupted copies are detected by the intended validator: a route reclassified, an unknown owner, a deleted handler, an enforced gate marked advisory, a command differing from the frozen `package.json`, an unasserted status, a deleted test copy, a missing cited test name, an invalid decision, an operation path absent from the OpenAPI, a missing artifact with an empty pending list, an unmapped extra file.
+- `bash tools/vg01_verify_frozen.sh contracts/legacy/awcms` still passes against the committed corpus (new artifacts reported as pending notes).
+- `tools/vg01_verify_migrations.sh` passes for 148 files, and fails on a changed digest and on an extra migration.
+
+### Findings outside this change
+
+- The AWCMS `ci.yml` comment says `bun run check` covers "all 52 gates"; the script chain expands to 63 distinct scripts.
+- Docs name checks that do not exist: `config:docs:check` ("part of `bun run check`"), `database:capacity:check`, `check:lockfile`, `extension:check`, `i18n:parity:check`, `i18n:pot:check`, `performance:query-plan:check`.
+- Once the freeze lands, `bash tools/vg01_verify_frozen.sh` should list the three new JSON files in its `required` array; that edit belongs with the freeze pull request.

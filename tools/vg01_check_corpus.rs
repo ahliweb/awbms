@@ -11,6 +11,7 @@
 // against real SQL, live DB introspection) belong to the vg01-freeze workflow.
 
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     env, fs,
     path::{Path, PathBuf},
@@ -242,7 +243,9 @@ struct Ctx {
     repo: PathBuf,
     failures: Vec<String>,
     ran: BTreeSet<String>,
-    notes: Vec<String>,
+    notes: RefCell<Vec<String>>,
+    /// Artifacts listed in fixture-usage.json `pendingArtifacts`.
+    pending: BTreeSet<String>,
 }
 
 type R = Result<(), String>;
@@ -841,7 +844,9 @@ fn check_vectors(c: &Ctx) -> R {
     ensure(
         expected("DB-RLS-001", "input").contains(&format!("{} migrations", inv.migrations.len())),
         "DB-RLS-001 input migration count differs from the migration inventory",
-    )
+    )?;
+    ensure_eq("vectors structuredSchemaVersion", j.get("structuredSchemaVersion").and_then(Json::num), Some(1))?;
+    structured_vectors(c, vs)
 }
 
 fn check_manifest_digests(c: &Ctx) -> R {
@@ -960,11 +965,17 @@ fn check_usage_map(c: &Ctx) -> R {
         }
         ensure(mapped.insert(path.clone(), ids).is_none(), format!("{path}: mapped twice"))?;
     }
+    // A path ending in `/` maps a whole tree (frozen test copies are data-dependent).
+    let covered = |file: &str| mapped.contains_key(file) || mapped.keys().any(|k| k.ends_with('/') && file.starts_with(k.as_str()));
     for p in &on_disk {
-        ensure(mapped.contains_key(p), format!("orphan fixture: {p} is not in fixture-usage.json"))?;
+        ensure(covered(p), format!("orphan fixture: {p} is not in fixture-usage.json"))?;
     }
     for p in mapped.keys() {
-        ensure(on_disk.contains(p), format!("fixture-usage.json maps nonexistent file {p}"))?;
+        let present = if p.ends_with('/') { on_disk.iter().any(|f| f.starts_with(p.as_str())) } else { on_disk.contains(p) };
+        ensure(present || c.pending.contains(p), format!("fixture-usage.json maps nonexistent file {p}"))?;
+    }
+    for p in &c.pending {
+        ensure(mapped.contains_key(p), format!("pendingArtifacts entry {p} is not mapped in artifacts[]"))?;
     }
     for id in consumers.keys() {
         ensure(used.contains(id), format!("consumer '{id}' is declared but consumes no artifact"))?;
@@ -982,18 +993,620 @@ fn check_usage_map(c: &Ctx) -> R {
     Ok(())
 }
 
+// ------------------------------------------------- structured artifacts ----
+//
+// gates.json, routes.json, behaviour-fixtures.json and the frozen test copies
+// are produced by tools/vg01_inventory.rs and arrive through the vg01-freeze
+// workflow. Until they are committed, `fixture-usage.json` lists them in
+// `pendingArtifacts`: an absent pending artifact is a note, a present one must
+// validate and must be mapped. The freeze pull request empties that list.
+
+const GATES: &str = "frozen/static/gates.json";
+const ROUTES: &str = "frozen/static/routes.json";
+const BEHAVIOUR: &str = "frozen/static/behaviour-fixtures.json";
+const TEST_TREE: &str = "frozen/static/source/tests/awcms/";
+const OPENAPI: &str = "frozen/static/source/awcms-public-api.openapi.yaml";
+
+impl Ctx {
+    fn note(&self, text: String) {
+        let mut notes = self.notes.borrow_mut();
+        if !notes.contains(&text) {
+            notes.push(text);
+        }
+    }
+}
+
+/// `Ok(true)` when the artifact exists and must be validated, `Ok(false)` when
+/// it is absent and listed as pending, an error when it is absent unlisted.
+fn artifact_present(c: &Ctx, rel: &str) -> Result<bool, String> {
+    let path = c.root.join(rel.trim_end_matches('/'));
+    let exists = if rel.ends_with('/') {
+        fs::read_dir(&path).map(|mut d| d.next().is_some()).unwrap_or(false)
+    } else {
+        path.is_file()
+    };
+    let pending = c.pending.contains(rel);
+    match (exists, pending) {
+        (true, true) => {
+            c.note(format!("{rel} is present but still listed in pendingArtifacts (validated; the freeze PR empties the list)"));
+            Ok(true)
+        }
+        (true, false) => Ok(true),
+        (false, true) => {
+            c.note(format!("{rel} is pending (not yet frozen); its validator was skipped"));
+            Ok(false)
+        }
+        (false, false) => Err(format!("{rel} is absent and not listed in fixture-usage.json pendingArtifacts")),
+    }
+}
+
+fn field<'a>(j: &'a Json, key: &str, what: &str) -> Result<&'a Json, String> {
+    j.get(key).ok_or(format!("{what}: missing {key}"))
+}
+
+fn str_field<'a>(j: &'a Json, key: &str, what: &str) -> Result<&'a str, String> {
+    field(j, key, what)?.str().ok_or(format!("{what}: {key} is not a string"))
+}
+
+fn arr_field<'a>(j: &'a Json, key: &str, what: &str) -> Result<&'a [Json], String> {
+    field(j, key, what)?.arr().ok_or(format!("{what}: {key} is not an array"))
+}
+
+fn num_field(j: &Json, key: &str, what: &str) -> Result<u64, String> {
+    field(j, key, what)?.num().ok_or(format!("{what}: {key} is not a non-negative integer"))
+}
+
+fn nonempty_strs(j: &Json, key: &str, what: &str) -> Result<Vec<String>, String> {
+    let items = arr_field(j, key, what)?;
+    ensure(!items.is_empty(), format!("{what}: {key} is empty"))?;
+    items
+        .iter()
+        .map(|x| match x.str() {
+            Some(s) if !s.trim().is_empty() => Ok(s.to_owned()),
+            _ => Err(format!("{what}: {key} holds an empty or non-string entry")),
+        })
+        .collect()
+}
+
+fn same_sha(j: &Json, key: &str, want: &str, what: &str) -> R {
+    ensure_eq(&format!("{what} {key}"), j.get(key).and_then(Json::str), Some(want))
+}
+
+/// `(METHOD, path with [param])` -> whether the operation declares `security: []`.
+fn openapi_ops(text: &str) -> BTreeMap<(String, String), bool> {
+    let mut out = BTreeMap::new();
+    let mut in_paths = false;
+    let mut path = String::new();
+    let mut current: Option<(String, String)> = None;
+    for line in text.lines() {
+        if line == "paths:" {
+            in_paths = true;
+            continue;
+        }
+        if !in_paths {
+            continue;
+        }
+        if !line.is_empty() && !line.starts_with(' ') {
+            break;
+        }
+        if line.starts_with("  /") && !line.starts_with("   ") && line.ends_with(':') {
+            path = line.trim().trim_end_matches(':').replace('{', "[").replace('}', "]");
+            current = None;
+        } else if let Some(m) = line.strip_prefix("    ").and_then(|l| l.strip_suffix(':')) {
+            if !m.starts_with(' ') && ["get", "post", "put", "patch", "delete", "options", "head"].contains(&m) {
+                let key = (m.to_ascii_uppercase(), path.clone());
+                out.insert(key.clone(), false);
+                current = Some(key);
+            }
+        } else if line == "      security: []"
+            && let Some(key) = &current
+        {
+            out.insert(key.clone(), true);
+        }
+    }
+    out
+}
+
+fn gate_like(name: &str) -> bool {
+    let segments: Vec<&str> = name.split(':').collect();
+    segments.iter().any(|s| matches!(*s, "check" | "verify"))
+        || segments.last().is_some_and(|s| matches!(*s, "lint" | "typecheck" | "test" | "e2e" | "coverage" | "build"))
+}
+
+fn bun_run_names(text: &str) -> Vec<String> {
+    text.match_indices("bun run ")
+        .filter_map(|(at, marker)| {
+            let name: String = text[at + marker.len()..]
+                .chars()
+                .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, ':' | '_' | '-'))
+                .collect();
+            let name = name.trim_end_matches(':').to_owned();
+            if name.is_empty() { None } else { Some(name) }
+        })
+        .collect()
+}
+
+fn expand_chain(name: &str, scripts: &BTreeMap<String, String>, seen: &mut BTreeSet<String>) {
+    if !seen.insert(name.to_owned()) {
+        return;
+    }
+    if let Some(cmd) = scripts.get(name) {
+        for inner in bun_run_names(cmd) {
+            expand_chain(&inner, scripts, seen);
+        }
+    }
+}
+
+fn package_scripts(c: &Ctx) -> Result<BTreeMap<String, String>, String> {
+    let pkg = c.json(&format!("{SRC}/awcms-package.json"))?;
+    match pkg.get("scripts") {
+        Some(Json::Obj(items)) => Ok(items.iter().filter_map(|(k, v)| v.str().map(|s| (k.clone(), s.to_owned()))).collect()),
+        _ => Err("frozen AWCMS package.json has no scripts object".into()),
+    }
+}
+
+fn check_gates(c: &Ctx) -> R {
+    if !artifact_present(c, GATES)? {
+        return Ok(());
+    }
+    let p = provenance(c)?;
+    let j = c.json(GATES)?;
+    same_sha(&j, "source_sha", &p.awcms, "gates.json")?;
+    let scripts = package_scripts(c)?;
+    let gates = arr_field(&j, "gates", "gates.json")?;
+    let workflows = arr_field(&j, "workflows", "gates.json")?;
+
+    // Workflow section vs the frozen raw CI file.
+    let mut jobs_by_workflow: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut pr_blocking: BTreeMap<String, bool> = BTreeMap::new();
+    for wf in workflows {
+        let file = str_field(wf, "file", "gates.json workflow")?.to_owned();
+        let jobs: BTreeSet<String> = arr_field(wf, "jobs", &file)?
+            .iter()
+            .filter_map(|job| job.get("id").and_then(Json::str).map(str::to_owned))
+            .collect();
+        pr_blocking.insert(file.clone(), matches!(wf.get("pr_blocking"), Some(Json::Bool(true))));
+        jobs_by_workflow.insert(file, jobs);
+    }
+    let ci = c.read(&format!("{SRC}/awcms-ci.yml"))?;
+    let mut raw_jobs = BTreeSet::new();
+    let mut in_jobs = false;
+    for line in ci.lines() {
+        if line == "jobs:" {
+            in_jobs = true;
+        } else if in_jobs && !line.is_empty() && !line.starts_with(' ') && !line.starts_with('#') {
+            in_jobs = false;
+        } else if in_jobs && line.starts_with("  ") && !line.starts_with("   ") && line.trim_end().ends_with(':') && !line.trim_start().starts_with('#') {
+            raw_jobs.insert(line.trim().trim_end_matches(':').to_owned());
+        }
+    }
+    ensure_eq(
+        "gates.json ci.yml jobs vs frozen awcms-ci.yml jobs",
+        jobs_by_workflow.get(".github/workflows/ci.yml"),
+        Some(&raw_jobs),
+    )?;
+    ensure(pr_blocking.get(".github/workflows/ci.yml") == Some(&true), "gates.json: ci.yml is not pr_blocking")?;
+
+    let mut ids = BTreeSet::new();
+    let mut tally: BTreeMap<&str, u64> = BTreeMap::new();
+    let mut by_id: BTreeMap<&str, &Json> = BTreeMap::new();
+    for g in gates {
+        let id = str_field(g, "id", "gate")?;
+        ensure(ids.insert(id.to_owned()), format!("duplicate gate {id}"))?;
+        by_id.insert(id, g);
+        let status = str_field(g, "status", id)?;
+        ensure(["enforced", "advisory", "absent"].contains(&status), format!("{id}: bad status {status}"))?;
+        *tally.entry(["enforced", "advisory", "absent"].iter().find(|s| **s == status).copied().unwrap_or("")).or_default() += 1;
+        ensure(!str_field(g, "reason", id)?.trim().is_empty(), format!("{id}: empty reason"))?;
+        ensure(!str_field(g, "kind", id)?.trim().is_empty(), format!("{id}: empty kind"))?;
+        let source = nonempty_strs(g, "source", id)?;
+        match str_field(g, "kind", id)? {
+            "package-script" => {
+                let name = id.strip_prefix("script:").ok_or(format!("{id}: package-script id must start with script:"))?;
+                ensure_eq(&format!("{id} command vs frozen package.json"), g.get("command").and_then(Json::str), scripts.get(name).map(String::as_str))?;
+                let ci_jobs = nonempty_or_empty(g, "ci_jobs", id)?;
+                ensure_eq(&format!("{id}: enforced iff a pull-request job runs it"), status == "enforced", !ci_jobs.is_empty())?;
+                for job in &ci_jobs {
+                    let (wf, job_id) = job.split_once(':').ok_or(format!("{id}: bad job label {job}"))?;
+                    let file = format!(".github/workflows/{wf}");
+                    ensure(jobs_by_workflow.get(&file).is_some_and(|s| s.contains(job_id)), format!("{id}: job {job} not in workflows[]"))?;
+                    ensure(pr_blocking.get(&file) == Some(&true), format!("{id}: ci_jobs names non-pull-request workflow {wf}"))?;
+                }
+                if let Some(file) = g.get("script_file").and_then(Json::str) {
+                    ensure(source.iter().any(|s| s == file), format!("{id}: script_file {file} not among source paths"))?;
+                }
+                ensure(source.iter().any(|s| s == "package.json"), format!("{id}: source must cite package.json"))?;
+            }
+            "workflow-job" => {
+                ensure_eq(&format!("{id} status"), status, "enforced")?;
+                ensure(source.iter().all(|s| pr_blocking.get(s) == Some(&true)), format!("{id}: workflow is not a pull-request workflow"))?;
+            }
+            kind if kind.starts_with("documented-") => {
+                ensure_eq(&format!("{id} status"), status, "absent")?;
+                ensure(
+                    source.iter().all(|s| s.rsplit_once(':').is_some_and(|(path, line)| !path.is_empty() && line.parse::<u64>().is_ok())),
+                    format!("{id}: absent entries must cite path:line"),
+                )?;
+                if let Some(name) = id.strip_prefix("doc-ref:") {
+                    ensure(!scripts.contains_key(name), format!("{id}: named script exists in the frozen package.json"))?;
+                }
+            }
+            "script-file" => ensure_eq(&format!("{id} status"), status, "advisory")?,
+            other => return Err(format!("{id}: unknown kind {other}")),
+        }
+    }
+    let summary = field(&j, "summary", "gates.json")?;
+    ensure_eq("gates summary total", num_field(summary, "total", "summary")?, gates.len() as u64)?;
+    for status in ["enforced", "advisory", "absent"] {
+        ensure_eq(&format!("gates summary {status}"), num_field(summary, status, "summary")?, tally.get(status).copied().unwrap_or(0))?;
+    }
+
+    // The `check` chain of the frozen package.json is the source of truth.
+    let check_cmd = scripts.get("check").ok_or("frozen package.json has no check script")?;
+    ensure(ci.contains("run: bun run check"), "frozen AWCMS CI does not run the full check chain")?;
+    let mut chain = BTreeSet::new();
+    expand_chain("check", &scripts, &mut chain);
+    chain.remove("check");
+    ensure_eq("gates summary check_chain_length", num_field(summary, "check_chain_length", "summary")?, chain.len() as u64)?;
+    ensure_eq(
+        "gates summary package_script_gates",
+        num_field(summary, "package_script_gates", "summary")?,
+        gates.iter().filter(|g| g.get("kind").and_then(Json::str) == Some("package-script")).count() as u64,
+    )?;
+    for item in check_cmd.split(" && ") {
+        let Some(name) = item.trim().strip_prefix("bun run ") else { continue };
+        if gate_like(name) {
+            let g = by_id.get(format!("script:{name}").as_str()).ok_or(format!("check-chain gate script:{name} is missing from gates.json"))?;
+            ensure_eq(&format!("script:{name} status"), g.get("status").and_then(Json::str), Some("enforced"))?;
+            ensure_eq(&format!("script:{name} in_check_chain"), matches!(g.get("in_check_chain"), Some(Json::Bool(true))), true)?;
+            ensure(
+                nonempty_or_empty(g, "ci_jobs", name)?.iter().any(|job| job == "ci.yml:quality"),
+                format!("script:{name} is in the check chain but not attributed to ci.yml:quality"),
+            )?;
+        }
+    }
+    ensure(tally.get("enforced").copied().unwrap_or(0) > 0 && tally.get("absent").copied().unwrap_or(0) > 0, "gate inventory must show both enforced and absent classes")
+}
+
+fn nonempty_or_empty(j: &Json, key: &str, what: &str) -> Result<Vec<String>, String> {
+    arr_field(j, key, what)?
+        .iter()
+        .map(|x| x.str().map(str::to_owned).ok_or(format!("{what}: {key} holds a non-string")))
+        .collect()
+}
+
+fn check_routes(c: &Ctx) -> R {
+    if !artifact_present(c, ROUTES)? {
+        return Ok(());
+    }
+    let p = provenance(c)?;
+    let j = c.json(ROUTES)?;
+    same_sha(&j, "source_sha", &p.awcms, "routes.json")?;
+    let summary = field(&j, "summary", "routes.json")?;
+    let routes = arr_field(&j, "routes", "routes.json")?;
+    let inv = load_inventory(c)?;
+    // Counts must agree with the frozen repo inventory.
+    let inv_total = inv.summary.get("Route files").copied().unwrap_or(0);
+    let inv_api = inv.routes.get("/api/v1/**").copied().unwrap_or(0);
+    let inv_admin = inv.routes.get("/admin/**").copied().unwrap_or(0);
+    ensure_eq("routes.json route_files vs inventory", num_field(summary, "route_files", "summary")?, inv_total)?;
+    ensure_eq("routes.json api_route_files vs inventory", num_field(summary, "api_route_files", "summary")?, inv_api)?;
+    ensure_eq("routes.json admin_route_files vs inventory", num_field(summary, "admin_route_files", "summary")?, inv_admin)?;
+    ensure_eq("routes.json public_route_files vs inventory", num_field(summary, "public_route_files", "summary")?, inv_total - inv_api - inv_admin)?;
+    ensure_eq("routes.json handlers", num_field(summary, "handlers", "summary")?, routes.len() as u64)?;
+
+    let mut owners: BTreeSet<String> = inv.modules.iter().cloned().collect();
+    owners.insert("platform".to_owned());
+    owners.insert("core".to_owned());
+    let oa = openapi_ops(&c.read(OPENAPI)?);
+    let mut files: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+    let mut class_tally: BTreeMap<String, u64> = BTreeMap::new();
+    let mut owner_tally: BTreeMap<String, u64> = BTreeMap::new();
+    let mut agreement: BTreeMap<String, u64> = BTreeMap::new();
+    let mut seen_ops = BTreeSet::new();
+    let mut seen_handlers = BTreeSet::new();
+    for r in routes {
+        let file = str_field(r, "file", "route")?;
+        let route = str_field(r, "route", file)?;
+        let method = str_field(r, "method", file)?;
+        let what = format!("{method} {route}");
+        ensure(seen_handlers.insert((file.to_owned(), method.to_owned())), format!("{what}: duplicate handler for {file}"))?;
+        ensure(file.starts_with("src/pages/"), format!("{what}: file outside src/pages"))?;
+        ensure(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "ALL"].contains(&method), format!("{what}: bad method"))?;
+        let surface = str_field(r, "surface", &what)?;
+        ensure(["api", "admin", "public"].contains(&surface), format!("{what}: bad surface"))?;
+        ensure_eq(&format!("{what} surface vs path"), surface, if route.starts_with("/api/") { "api" } else if route == "/admin" || route.starts_with("/admin/") { "admin" } else { "public" })?;
+        files.entry((surface.to_owned(), file.to_owned())).or_default().insert(method.to_owned());
+        let owner = str_field(r, "owner", &what)?;
+        ensure(owners.contains(owner), format!("{what}: owner {owner} is neither a registered module nor platform/core"))?;
+        ensure(!str_field(r, "owner_basis", &what)?.is_empty(), format!("{what}: empty owner_basis"))?;
+        let class = str_field(r, "auth_class", &what)?;
+        ensure(["public", "session", "machine-credential", "admin", "indeterminate"].contains(&class), format!("{what}: bad auth_class {class}"))?;
+        ensure_eq(&format!("{what}: admin class iff admin surface"), class == "admin", surface == "admin")?;
+        nonempty_strs(r, "auth_markers", &what)?;
+        let machine = str_field(r, "machine_credential", &what)?;
+        ensure(["accepted-by-guard", "refused-in-handler", "unspecified", "not-applicable"].contains(&machine), format!("{what}: bad machine_credential"))?;
+        let verdict = str_field(r, "openapi_agreement", &what)?;
+        ensure(["agrees", "differs", "indeterminate", "not-in-openapi", "not-applicable"].contains(&verdict), format!("{what}: bad openapi_agreement"))?;
+        let security = str_field(r, "openapi_security", &what)?;
+        if surface == "api" {
+            match oa.get(&(method.to_owned(), route.to_owned())) {
+                Some(none) => {
+                    seen_ops.insert((method.to_owned(), route.to_owned()));
+                    ensure_eq(&format!("{what}: openapi_security vs frozen OpenAPI"), security == "none", *none)?;
+                    ensure(verdict != "not-in-openapi", format!("{what}: documented in OpenAPI but marked not-in-openapi"))?;
+                    let agrees = match class {
+                        "public" => *none,
+                        "session" | "machine-credential" => !*none,
+                        _ => false,
+                    };
+                    let expected = if class == "indeterminate" { "indeterminate" } else if agrees { "agrees" } else { "differs" };
+                    ensure_eq(&format!("{what}: openapi_agreement recomputed from the frozen OpenAPI"), verdict, expected)?;
+                }
+                None => ensure_eq(&format!("{what}: not documented in the frozen OpenAPI"), verdict, "not-in-openapi")?,
+            }
+            if verdict == "differs" {
+                ensure(r.get("note").and_then(Json::str).is_some_and(|n| !n.is_empty()), format!("{what}: differs from OpenAPI without an explanation (note)"))?;
+            }
+        } else {
+            ensure_eq(&format!("{what}: non-API route"), verdict, "not-applicable")?;
+        }
+        *class_tally.entry(class.to_owned()).or_default() += 1;
+        *owner_tally.entry(owner.to_owned()).or_default() += 1;
+        *agreement.entry(verdict.to_owned()).or_default() += 1;
+    }
+    ensure_eq("routes.json distinct route files", files.len() as u64, inv_total)?;
+    let ops: BTreeSet<(String, String)> = oa.keys().cloned().collect();
+    ensure_eq("every frozen OpenAPI operation has a route handler", seen_ops, ops.clone())?;
+    for module in &inv.modules {
+        ensure(owner_tally.contains_key(module), format!("registered module {module} owns no route"))?;
+    }
+    let tally_of = |key: &str| -> Result<BTreeMap<String, u64>, String> {
+        match field(summary, key, "summary")? {
+            Json::Obj(items) => items.iter().map(|(k, v)| v.num().map(|n| (k.clone(), n)).ok_or(format!("summary.{key}.{k}"))).collect(),
+            _ => Err(format!("summary.{key} is not an object")),
+        }
+    };
+    ensure_eq("routes summary auth_class", tally_of("auth_class")?, class_tally)?;
+    ensure_eq("routes summary owner", tally_of("owner")?, owner_tally)?;
+    ensure_eq("routes summary openapi_agreement", tally_of("openapi_agreement")?, agreement)?;
+    ensure_eq("routes summary openapi_operations", num_field(summary, "openapi_operations", "summary")?, ops.len() as u64)
+}
+
+fn check_behaviour(c: &Ctx) -> R {
+    if !artifact_present(c, BEHAVIOUR)? {
+        return Ok(());
+    }
+    let p = provenance(c)?;
+    let j = c.json(BEHAVIOUR)?;
+    same_sha(&j, "source_sha", &p.awcms, "behaviour-fixtures.json")?;
+    same_sha(&j, "astro_source_sha", &p.astro, "behaviour-fixtures.json")?;
+    let oa_text = c.read(OPENAPI)?;
+    let oa = openapi_ops(&oa_text);
+
+    // Classes: every one is stated, with an honest status.
+    let mut classes = BTreeMap::new();
+    for cl in arr_field(&j, "classes", "behaviour-fixtures.json")? {
+        let name = str_field(cl, "class", "class")?;
+        let status = str_field(cl, "status", name)?;
+        ensure(["available", "available-by-reference", "not-available"].contains(&status), format!("{name}: bad status"))?;
+        ensure(!str_field(cl, "what", name)?.is_empty(), format!("{name}: empty what"))?;
+        classes.insert(name.to_owned(), (status.to_owned(), num_field(cl, "count", name)?));
+    }
+    for required in [
+        "openapi-operation-contracts",
+        "test-asserted-exchanges",
+        "astro-consumer-mocked-fetch",
+        "openapi-request-response-body-examples",
+        "recorded-live-responses",
+    ] {
+        ensure(classes.contains_key(required), format!("behaviour class {required} is not stated"))?;
+    }
+    let example_blocks = oa_text.lines().filter(|l| l.trim_start().starts_with("examples:")).count() as u64;
+    ensure_eq("body-examples class vs frozen OpenAPI `examples:` blocks", classes["openapi-request-response-body-examples"].1, example_blocks)?;
+    ensure_eq(
+        "body-examples class status",
+        classes["openapi-request-response-body-examples"].0.as_str(),
+        if example_blocks == 0 { "not-available" } else { "available" },
+    )?;
+    let astro_test = c.read(&format!("{SRC}/awcms-astro-contract.test.mjs"))?;
+    ensure_eq("astro mocked-fetch count vs frozen consumer test", classes["astro-consumer-mocked-fetch"].1, astro_test.matches("globalThis.fetch = ").count() as u64)?;
+
+    // OpenAPI operation contracts.
+    let ops = arr_field(&j, "openapi_operations", "behaviour-fixtures.json")?;
+    ensure_eq("openapi-operation-contracts count", classes["openapi-operation-contracts"].1, ops.len() as u64)?;
+    let mut listed = BTreeSet::new();
+    for o in ops {
+        let method = str_field(o, "method", "operation")?;
+        let path = str_field(o, "path", "operation")?;
+        let what = format!("{method} {path}");
+        listed.insert((method.to_owned(), path.to_owned()));
+        let none = oa.get(&(method.to_owned(), path.to_owned())).ok_or(format!("{what}: not in the frozen OpenAPI"))?;
+        ensure_eq(&format!("{what}: security vs frozen OpenAPI"), str_field(o, "security", &what)? == "none", *none)?;
+        let responses = arr_field(o, "responses", &what)?;
+        for r in responses {
+            let text = r.str().ok_or(format!("{what}: response entry is not a string"))?;
+            let code = text.split(' ').next().unwrap_or("");
+            ensure(code == "default" || code.parse::<u16>().is_ok_and(|n| (100..=599).contains(&n)), format!("{what}: bad response status '{code}'"))?;
+        }
+        ensure(!responses.is_empty(), format!("{what}: no documented responses"))?;
+    }
+    ensure_eq("operation contracts vs frozen OpenAPI operations", listed, oa.keys().cloned().collect())?;
+
+    // Frozen test tree: exact set, and every cited exchange resolves in it.
+    let mut on_disk = Vec::new();
+    if c.root.join(TEST_TREE.trim_end_matches('/')).is_dir() {
+        walk(&c.root.join(TEST_TREE.trim_end_matches('/')), &c.root.join(TEST_TREE.trim_end_matches('/')), &mut on_disk)?;
+    }
+    on_disk.sort();
+    let frozen_listed: Vec<String> = nonempty_strs(&j, "frozen_test_sources", "behaviour-fixtures.json")?;
+    ensure_eq("frozen_test_sources vs files under the frozen test tree", sorted(frozen_listed.clone()), on_disk)?;
+    let exchanges = arr_field(&j, "test_asserted_exchanges", "behaviour-fixtures.json")?;
+    ensure_eq("test-asserted-exchanges count", classes["test-asserted-exchanges"].1, exchanges.len() as u64)?;
+    ensure(!exchanges.is_empty() || classes["test-asserted-exchanges"].0 == "not-available", "no exchanges but the class is not marked not-available")?;
+    let mut cited_files = BTreeSet::new();
+    for e in exchanges {
+        let test = str_field(e, "test", "exchange")?;
+        let what = format!("exchange '{test}'");
+        let method = str_field(e, "method", &what)?;
+        ensure(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(&method), format!("{what}: bad method"))?;
+        ensure(str_field(e, "path", &what)?.starts_with('/'), format!("{what}: path must start with /"))?;
+        ensure(["test-title", "describe-title", "request-literal"].contains(&str_field(e, "operation_source", &what)?), format!("{what}: bad operation_source"))?;
+        let statuses = arr_field(e, "expected_status", &what)?;
+        ensure(!statuses.is_empty(), format!("{what}: no expected status"))?;
+        let source = str_field(e, "source", &what)?;
+        let rest = source.strip_prefix("ahliweb/awcms:").ok_or(format!("{what}: source must start with ahliweb/awcms:"))?;
+        let (rel, line) = rest.rsplit_once(':').ok_or(format!("{what}: source lacks :line"))?;
+        let line: usize = line.parse().map_err(|_| format!("{what}: bad line number"))?;
+        let copy = str_field(e, "frozen_copy", &what)?;
+        ensure_eq(&format!("{what}: frozen_copy path"), copy, format!("source/tests/awcms/{rel}").as_str())?;
+        cited_files.insert(rel.to_owned());
+        let text = c.read(&format!("frozen/static/{copy}"))?;
+        let lines: Vec<&str> = text.lines().collect();
+        let at = |n: usize| lines.get(n).copied().unwrap_or("");
+        ensure(
+            at(line - 1).contains(test) || at(line).contains(test),
+            format!("{what}: title not found at {rel}:{line} in the frozen copy"),
+        )?;
+        for s in statuses {
+            let code = s.num().ok_or(format!("{what}: non-integer status"))?;
+            ensure(
+                text.contains(&format!(".status).toBe({code})")) || text.contains(&format!(".status).toEqual({code})")),
+                format!("{what}: status {code} is not asserted in {rel}"),
+            )?;
+        }
+    }
+    let vectors = c.json(VECTORS)?;
+    let vector_tests = vector_awcms_tests(arr_field(&vectors, "vectors", "vectors.json")?);
+    for rel in &frozen_listed {
+        ensure(
+            cited_files.contains(rel) || vector_tests.contains(rel),
+            format!("frozen test file {rel} is cited by no exchange or vector"),
+        )?;
+    }
+    for rel in &vector_tests {
+        ensure(frozen_listed.contains(rel), format!("vector-cited test file {rel} is not among frozen_test_sources"))?;
+    }
+    Ok(())
+}
+
+/// Repository-relative AWCMS test paths that authorization vectors cite.
+fn vector_awcms_tests(vs: &[Json]) -> BTreeSet<String> {
+    vs.iter()
+        .filter_map(|v| v.get("structured")?.get("citation"))
+        .filter(|cit| cit.get("repository").and_then(Json::str) == Some("ahliweb/awcms"))
+        .filter_map(|cit| cit.get("path").and_then(Json::str).map(str::to_owned))
+        .collect()
+}
+
+const DECISIONS: [&str; 5] = ["allow", "deny", "fail-closed", "neutral-response", "invariant"];
+const ACTORS: [&str; 3] = ["machine-credential", "anonymous", "database-role"];
+const TENANT_RELATIONS: [&str; 6] = [
+    "credential-bound",
+    "credential-bound-header-matching",
+    "credential-bound-header-conflicting",
+    "host-or-verified-origin-derived",
+    "not-applicable",
+    "schema-wide",
+];
+const TEST_KINDS: [&str; 3] = ["behavioural-unit", "static-source-assertion", "introspection"];
+
+/// Structured fields of every authorization vector (applies immediately; the
+/// citations into not-yet-frozen test copies are pending-gated).
+fn structured_vectors(c: &Ctx, vs: &[Json]) -> R {
+    let oa = openapi_ops(&c.read(OPENAPI)?);
+    let oa_paths: BTreeSet<&str> = oa.keys().map(|(_, p)| p.as_str()).collect();
+    for v in vs {
+        let id = str_field(v, "id", "vector")?;
+        let s = v.get("structured").ok_or(format!("{id}: missing structured block"))?;
+        let what = format!("{id}.structured");
+        ensure(ACTORS.contains(&str_field(s, "actor", &what)?), format!("{what}: bad actor"))?;
+        ensure(!str_field(s, "credentialClass", &what)?.trim().is_empty(), format!("{what}: empty credentialClass"))?;
+        ensure(TENANT_RELATIONS.contains(&str_field(s, "tenantRelation", &what)?), format!("{what}: bad tenantRelation"))?;
+        ensure(DECISIONS.contains(&str_field(s, "expectedDecision", &what)?), format!("{what}: bad expectedDecision"))?;
+        ensure(TEST_KINDS.contains(&str_field(s, "testKind", &what)?), format!("{what}: bad testKind"))?;
+        let ops = arr_field(s, "operations", &what)?;
+        ensure(!ops.is_empty(), format!("{what}: no operations"))?;
+        let mut http = false;
+        for op in ops {
+            match str_field(op, "kind", &what)? {
+                "http" => {
+                    http = true;
+                    let method = str_field(op, "method", &what)?;
+                    let path = str_field(op, "path", &what)?;
+                    ensure(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(&method), format!("{what}: bad method {method}"))?;
+                    ensure(oa_paths.contains(path), format!("{what}: {path} is not a path of the frozen OpenAPI"))?;
+                    if method != "OPTIONS" {
+                        ensure(oa.contains_key(&(method.to_owned(), path.to_owned())), format!("{what}: {method} {path} is not an operation of the frozen OpenAPI"))?;
+                    }
+                }
+                "build-function" => {
+                    for f in ["repository", "file", "name"] {
+                        ensure(!str_field(op, f, &what)?.trim().is_empty(), format!("{what}: build-function {f} empty"))?;
+                    }
+                }
+                "database-introspection" => {}
+                other => return Err(format!("{what}: unknown operation kind {other}")),
+            }
+        }
+        match s.get("expectedStatus") {
+            Some(Json::Null) => {}
+            Some(n) => {
+                ensure(http, format!("{what}: expectedStatus set without an http operation"))?;
+                ensure(n.num().is_some_and(|n| (100..=599).contains(&n)), format!("{what}: expectedStatus is not an HTTP status"))?;
+            }
+            None => return Err(format!("{what}: missing expectedStatus (use null when none)")),
+        }
+        let cit = field(s, "citation", &what)?;
+        if let Some(files) = cit.get("frozenFiles") {
+            ensure_eq(&format!("{what}: evidence kind"), str_field(cit, "evidence", &what)?, "live-introspection")?;
+            ensure(!files.arr().unwrap_or(&[]).is_empty(), format!("{what}: no frozenFiles"))?;
+            for f in files.arr().unwrap_or(&[]) {
+                let rel = f.str().ok_or(format!("{what}: frozenFiles entry is not a string"))?;
+                ensure(c.root.join(rel).is_file(), format!("{what}: frozen file {rel} does not exist"))?;
+            }
+            ensure_eq(&format!("{what}: testKind for live evidence"), str_field(s, "testKind", &what)?, "introspection")?;
+        } else {
+            let repo = str_field(cit, "repository", &what)?;
+            ensure(["ahliweb/awcms", "ahliweb/awcms-astro"].contains(&repo), format!("{what}: bad citation repository"))?;
+            let path = str_field(cit, "path", &what)?;
+            let test = str_field(cit, "test", &what)?;
+            ensure(!test.trim().is_empty(), format!("{what}: empty cited test name"))?;
+            ensure_eq(&format!("{what}: prose source vs citation"), str_field(v, "source", id)?, format!("{repo}:{path}").as_str())?;
+            let copy = str_field(cit, "frozenCopy", &what)?;
+            ensure(copy.starts_with("frozen/static/source/"), format!("{what}: frozenCopy must live under frozen/static/source/"))?;
+            if c.root.join(copy).is_file() {
+                let text = c.read(copy)?;
+                ensure(text.contains(test), format!("{what}: cited test '{test}' does not appear in {copy}"))?;
+            } else if c.pending.contains(TEST_TREE) && copy.starts_with(TEST_TREE) {
+                c.note(format!("citation target {copy} is pending (vector citations resolve after the freeze)"));
+            } else {
+                return Err(format!("{what}: frozen copy {copy} does not exist and is not pending"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 || args.len() > 3 {
         eprintln!("usage: vg01_check_corpus <contracts/legacy/awcms> [repo-root]");
         return ExitCode::from(2);
     }
+    let root = PathBuf::from(&args[1]);
+    let pending: BTreeSet<String> = fs::read_to_string(root.join("fixture-usage.json"))
+        .ok()
+        .and_then(|text| parse_json(&text).ok())
+        .and_then(|j| j.get("pendingArtifacts").and_then(Json::arr).map(|a| a.iter().filter_map(|x| x.str().map(str::to_owned)).collect()))
+        .unwrap_or_default();
     let mut c = Ctx {
-        root: PathBuf::from(&args[1]),
+        root,
         repo: PathBuf::from(args.get(2).map_or(".", String::as_str)),
         failures: Vec::new(),
         ran: BTreeSet::new(),
-        notes: Vec::new(),
+        notes: RefCell::new(Vec::new()),
+        pending,
     };
     c.check("stale-source-sha", check_stale_sha);
     c.check("modules-registry", check_modules);
@@ -1008,9 +1621,12 @@ fn main() -> ExitCode {
     c.check("vectors", check_vectors);
     c.check("manifest-digests", check_manifest_digests);
     c.check("source-headers", check_source_headers);
+    c.check("gates", check_gates);
+    c.check("routes", check_routes);
+    c.check("behaviour-fixtures", check_behaviour);
     c.check("usage-map", check_usage_map);
-    c.notes.push("authorization vectors are prose (input/expected strings); no parity harness executes them yet".into());
-    for n in &c.notes {
+    c.note("authorization vectors carry structured fields and cited tests; no parity harness executes them yet".into());
+    for n in c.notes.borrow().iter() {
         println!("note  {n}");
     }
     if c.failures.is_empty() {
@@ -1038,6 +1654,50 @@ mod tests {
     fn csv_handles_quotes_and_newlines() {
         let r = parse_csv("a,b\n\"x,1\",\"y\"\"z\nw\"\n");
         assert_eq!(r[1], vec!["x,1".to_owned(), "y\"z\nw".to_owned()]);
+    }
+
+    #[test]
+    fn openapi_ops_reads_methods_and_open_security() {
+        let yaml = "paths:\n  /api/v1/x/{id}:\n    get:\n      security: []\n      responses: {}\n    post:\n      responses: {}\ncomponents:\n  a: b\n";
+        let ops = openapi_ops(yaml);
+        assert_eq!(ops.len(), 2);
+        assert_eq!(ops[&("GET".to_owned(), "/api/v1/x/[id]".to_owned())], true);
+        assert_eq!(ops[&("POST".to_owned(), "/api/v1/x/[id]".to_owned())], false);
+    }
+
+    #[test]
+    fn gate_names_and_chains() {
+        assert!(gate_like("modules:dag:check") && gate_like("typecheck") && !gate_like("db:migrate"));
+        let scripts: BTreeMap<String, String> = [("check", "bun run a:check && bun run build"), ("build", "bun run build:x"), ("a:check", "x"), ("build:x", "y")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        let mut seen = BTreeSet::new();
+        expand_chain("check", &scripts, &mut seen);
+        assert_eq!(seen.len(), 4);
+        assert_eq!(bun_run_names("bun run a:check && bun run i18n:"), vec!["a:check", "i18n"]);
+    }
+
+    #[test]
+    fn pending_artifacts_gate_absence() {
+        let root = env::temp_dir().join(format!("awbms-vg01-pending-{}", std::process::id()));
+        fs::create_dir_all(root.join("frozen/static")).unwrap();
+        fs::write(root.join("frozen/static/present.json"), "{}").unwrap();
+        let mk = |pending: &[&str]| Ctx {
+            root: root.clone(),
+            repo: root.clone(),
+            failures: Vec::new(),
+            ran: BTreeSet::new(),
+            notes: RefCell::new(Vec::new()),
+            pending: pending.iter().map(|s| (*s).to_owned()).collect(),
+        };
+        let listed = mk(&["frozen/static/absent.json"]);
+        assert_eq!(artifact_present(&listed, "frozen/static/absent.json"), Ok(false));
+        assert_eq!(artifact_present(&listed, "frozen/static/present.json"), Ok(true));
+        let unlisted = mk(&[]);
+        assert!(artifact_present(&unlisted, "frozen/static/absent.json").is_err());
+        assert_eq!(artifact_present(&mk(&["frozen/static/present.json"]), "frozen/static/present.json"), Ok(true));
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
