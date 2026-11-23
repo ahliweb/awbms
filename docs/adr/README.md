@@ -51,7 +51,8 @@ project's own argument against maintaining the same statement in two places.
 | [0006](0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09 | Accepted |
 | [0007](0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Keep the VG-01 legacy baseline pinned for Stage 1 | Accepted |
 | [0008](0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) | Close OD-03, OD-05 and OD-06, resolve the assumption register, and sign off Stage 1 | Accepted |
-| [0009](0009-accept-stage-2-prd-owner-decisions-pd-01-22.md) | Accept the Stage 2 PRD and its owner decisions PD-01 to PD-22 | Accepted |
+| [0009](0009-accept-stage-2-prd-owner-decisions-pd-01-22.md) | Accept the Stage 2 PRD and its owner decisions PD-01 to PD-22 | Accepted; `PD-12` superseded by 0010 |
+| [0010](0010-data-subject-request-deadlines-follow-uu-pdp.md) | Data-subject request deadlines follow UU PDP (supersedes PD-12 of ADR-0009) | Accepted |
 
 ## Writing one
 
