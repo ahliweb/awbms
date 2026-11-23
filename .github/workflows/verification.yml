@@ -91,7 +91,7 @@ jobs:
           grep -F '"count": 24' /tmp/vg01-a/modules.json
           grep -F '"count": 148' /tmp/vg01-a/migrations.json
           grep -F '"status": "partial-static-source-evidence"' /tmp/vg01-a/manifest.json
-          for artifact in gates routes behaviour-fixtures; do
+          for artifact in gates routes behaviour-fixtures rate-limits credential-formats; do
             test -s "/tmp/vg01-a/$artifact.json"
           done
 

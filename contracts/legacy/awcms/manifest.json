@@ -64,12 +64,15 @@
     {"id":"authorization-vectors","status":"structured-fields-added-citations-resolve-after-freeze","artifact":"authorization/vectors.json","check":"tools/vg01_check_corpus.rs (vectors)"},
     {"id":"astro-consumer-contract","status":"frozen-and-verified"},
     {"id":"representative-behavior-fixtures","status":"generator-ready-pending-freeze-partial","artifact":"frozen/static/behaviour-fixtures.json","generator":"tools/vg01_inventory.rs","check":"tools/vg01_check_corpus.rs (behaviour-fixtures)"},
+    {"id":"rate-limit-dimensions","status":"generator-ready-pending-freeze","artifact":"frozen/static/rate-limits.json","generator":"tools/vg01_inventory.rs","check":"tools/vg01_check_corpus.rs (rate-limits)","supersedes":"C-07"},
+    {"id":"credential-storage-formats","status":"generator-ready-pending-freeze","artifact":"frozen/static/credential-formats.json","generator":"tools/vg01_inventory.rs","check":"tools/vg01_check_corpus.rs (credential-formats)"},
     {"id":"artifact-usage-check","status":"implemented","check":"tools/vg01_verify_frozen.sh (fixture-usage.json)"}
   ],
   "remainingBlockers": [
     "vg01-freeze run to freeze gates.json, routes.json, behaviour-fixtures.json and the cited test copies, then empty fixture-usage.json pendingArtifacts",
     "request/response body fixtures: the pinned source holds no body examples and no recorded responses",
-    "a parity harness that executes the structured authorization vectors"
+    "a parity harness that executes the structured authorization vectors",
+    "vg01-freeze run to freeze rate-limits.json, credential-formats.json and the cited implementation copies under source/awcms-impl/, then empty fixture-usage.json pendingArtifacts"
   ],
   "passRule": "VG-01 remains non-PASS until every required artifact is frozen with provenance/digest and is consumed by a deterministic check or parity test."
 }

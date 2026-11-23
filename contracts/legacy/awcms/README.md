@@ -59,8 +59,11 @@ contracts/legacy/awcms/
     │   ├── gates.json             # generated; frozen by the next vg01-freeze run
     │   ├── routes.json            # generated; frozen by the next vg01-freeze run
     │   ├── behaviour-fixtures.json  # generated; frozen by the next vg01-freeze run
+    │   ├── rate-limits.json       # generated; frozen by the next vg01-freeze run
+    │   ├── credential-formats.json  # generated; frozen by the next vg01-freeze run
     │   └── source/                # pinned copies (OpenAPI, AsyncAPI, CI, package.json, ...)
-    │       └── tests/awcms/       # cited AWCMS test files (generated; same freeze run)
+    │       ├── tests/awcms/       # cited AWCMS test files (generated; frozen with the inventories above)
+    │       └── awcms-impl/        # implementation files that rate-limits.json and credential-formats.json cite, at their repository paths (generated; next freeze run)
     └── live/                # controlled live PostgreSQL RLS / role introspection
 ```
 
@@ -70,16 +73,56 @@ Frozen files are published only through the `vg01-freeze` workflow
 
 ### Pending artifacts
 
-`tools/vg01_inventory.rs` already generates `gates.json`, `routes.json`,
-`behaviour-fixtures.json` and the cited test copies, and
-`tools/vg01_check_corpus.rs` already validates them, but they are not committed
-until the `vg01-freeze` workflow runs. Until then `fixture-usage.json` lists
-them in `pendingArtifacts`: an absent pending artifact is a note, a present one
-must validate and must be mapped, and the freeze workflow's own verification
-therefore already enforces them. **The freeze pull request empties
-`pendingArtifacts`** (after which absence is a failure). `verification.yml`
-also checks, on every pull request, that the checker accepts the freshly
-generated output (`tools/vg01_check_generated.sh`).
+`tools/vg01_inventory.rs` generates `rate-limits.json`, `credential-formats.json`
+and the implementation files they cite (`source/awcms-impl/`), and
+`tools/vg01_check_corpus.rs` validates them (`check:rate-limits`,
+`check:credential-formats`), but they are not committed until the `vg01-freeze`
+workflow runs. Until then `fixture-usage.json` lists them in `pendingArtifacts`:
+an absent pending artifact is a note, a present one must validate and must be
+mapped, and the freeze workflow's own verification therefore already enforces
+them. **The freeze pull request empties `pendingArtifacts`** (after which
+absence is a failure). `verification.yml` also checks, on every pull request,
+that the checker accepts the freshly generated output
+(`tools/vg01_check_generated.sh`). The gate, route and behaviour inventories and
+their test copies were frozen by an earlier run and are no longer pending.
+
+### Rate limits and credential formats
+
+Both artifacts are derived from the pinned AWCMS implementation, never from
+prose, and every fact in them cites `path`, `line` and an `anchor` that is a
+substring of that line; the cited files are copied to `source/awcms-impl/` so
+the checker re-resolves each citation inside the corpus.
+
+- `rate-limits.json`: every call of `checkSharedRateLimit` / `checkAuthRateLimit`
+  under `src/` (38 call lines, 40 call sites once the newsletter preflight
+  wrapper is expanded at its three callers), with route and handler, bucket key
+  template, key dimensions and where an attacker-chosen value could enter,
+  threshold and window setting names with their defaults, the parser each one
+  goes through (and what an invalid value does), the limiter module's own
+  behaviour (fixed window, Redis `INCR`/`PEXPIRE` or in-process `Map`, fail-open
+  on Redis failure, `X-Forwarded-For` trust), and the non-limiter controls that
+  bound abuse: per-account password lockout, per-factor MFA lockout, the
+  newsletter per-recipient cooldown and the Turnstile call sites. It also
+  states what the source cannot establish (deployment configuration, edge
+  limits).
+- `credential-formats.json`: password hashing (library, algorithm, parameters,
+  where verified and written), the generator and at-rest hash format of each
+  bearer token kind with the database `CHECK` that pins it, the encrypted
+  secrets, and an inventory of every credential-like column of the migrations
+  classified as hash / encrypted / env-var-name / plaintext-candidate. Only
+  formats and parameters are recorded; no hash, key, secret or fixture
+  credential is copied, and the checker fails on a PHC string that carries a
+  salt or digest or on any digest-like hex run.
+
+**`C-07` verdict recorded by the generator: confirmed.** `POST
+/api/v1/newsletter/subscribe` is limited per client IP only (`subscribe.ts:139`,
+5 requests per 300 s by default), and a separate recipient-oriented cooldown is
+enforced inside the upsert (`subscriber-directory.ts:153-179`): a confirmation
+e-mail is re-issued to an existing `(tenant_id, email_normalized)` row only if
+`confirmation_sent_at` is `NULL` or older than `NEWSLETTER_CONFIRMATION_COOLDOWN_SEC`
+(default 900 s), and a refused re-send gets the same neutral response as every
+other branch. The checker recomputes the verdict from the recorded limiter
+dimensions and the cited SQL.
 
 ## What will be proven once the freeze pull request lands
 

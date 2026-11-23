@@ -1,7 +1,11 @@
 {
   "schemaVersion": 1,
   "gate": "VG-01",
-  "pendingArtifacts": [],
+  "pendingArtifacts": [
+    "frozen/static/rate-limits.json",
+    "frozen/static/credential-formats.json",
+    "frozen/static/source/awcms-impl/"
+  ],
   "pendingNote": "Artifacts that tools/vg01_inventory.rs now generates but the vg01-freeze workflow has not yet frozen. An absent pending artifact is reported as a note by tools/vg01_check_corpus.rs; a present one must validate and must be mapped below. The orchestrator empties this list in the freeze pull request, after which absence is a failure. A path ending in / maps a whole tree.",
   "note": "Maps every file under frozen/ plus authorization/vectors.json to the checks that consume it. Paths in artifacts[] are relative to contracts/legacy/awcms/; consumer files are relative to the repository root. Enforced by tools/vg01_check_corpus.rs (usage-map check), run from tools/vg01_verify_frozen.sh. strength: content = cross-checked against another fixture or derived source; structural = shape/presence asserted; integrity = SHA-256 only.",
   "consumers": [
@@ -25,6 +29,8 @@
     {"id": "chk-gates", "file": "tools/vg01_check_corpus.rs", "marker": "c.check(\"gates\",", "strength": "content"},
     {"id": "chk-routes", "file": "tools/vg01_check_corpus.rs", "marker": "c.check(\"routes\",", "strength": "content"},
     {"id": "chk-behaviour-fixtures", "file": "tools/vg01_check_corpus.rs", "marker": "c.check(\"behaviour-fixtures\",", "strength": "content"},
+    {"id": "chk-rate-limits", "file": "tools/vg01_check_corpus.rs", "marker": "c.check(\"rate-limits\",", "strength": "content"},
+    {"id": "chk-credential-formats", "file": "tools/vg01_check_corpus.rs", "marker": "c.check(\"credential-formats\",", "strength": "content"},
     {"id": "ci-migration-sql", "file": "tools/vg01_verify_migrations.sh", "marker": "sha256sum", "strength": "content"}
   ],
   "artifacts": [
@@ -37,6 +43,9 @@
     {"path": "frozen/static/gates.json", "consumers": ["chk-gates"]},
     {"path": "frozen/static/routes.json", "consumers": ["chk-routes"]},
     {"path": "frozen/static/behaviour-fixtures.json", "consumers": ["chk-behaviour-fixtures"]},
+    {"path": "frozen/static/rate-limits.json", "consumers": ["chk-rate-limits"]},
+    {"path": "frozen/static/credential-formats.json", "consumers": ["chk-credential-formats"]},
+    {"path": "frozen/static/source/awcms-impl/", "consumers": ["chk-rate-limits", "chk-credential-formats"]},
     {"path": "frozen/static/source/tests/awcms/", "consumers": ["chk-behaviour-fixtures", "chk-vectors"]},
     {"path": "frozen/static/source/awcms-public-api.openapi.yaml", "consumers": ["chk-openapi-security", "chk-route-test-counts", "chk-source-headers", "chk-routes", "chk-behaviour-fixtures", "chk-vectors"]},
     {"path": "frozen/static/source/awcms-domain-events.asyncapi.yaml", "consumers": ["chk-source-headers"]},

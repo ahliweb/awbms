@@ -156,3 +156,126 @@ Verdict columns describe the state after that freeze run; nothing here is PASS.
 - The AWCMS `ci.yml` comment says `bun run check` covers "all 52 gates"; the script chain expands to 63 distinct scripts.
 - Docs name checks that do not exist: `config:docs:check` ("part of `bun run check`"), `database:capacity:check`, `check:lockfile`, `extension:check`, `i18n:parity:check`, `i18n:pot:check`, `performance:query-plan:check`.
 - Once the freeze lands, `bash tools/vg01_verify_frozen.sh` should list the three new JSON files in its `required` array; that edit belongs with the freeze pull request.
+
+## Follow-up: rate-limit and credential-format inventories
+
+A further change extends `tools/vg01_inventory.rs` and `tools/vg01_check_corpus.rs`
+for the two items of the validation's required inventory that no frozen
+artifact covers: "rate-limit and abuse-control dimensions per endpoint class"
+(superseding claim `C-07`) and "password and machine-credential storage
+formats in use". It commits no generated corpus; the files come from the next
+`vg01-freeze` run, `fixture-usage.json` lists them in `pendingArtifacts`, the
+baseline is not refreshed (pins unchanged) and no gate changes state.
+
+| Artifact (frozen by the next run) | Content | Validator |
+|---|---|---|
+| `frozen/static/rate-limits.json` | 38 limiter call lines, 40 call sites (the newsletter preflight wrapper expanded at its three callers), 53 buckets in 39 endpoint classes; bucket key template and dimensions; threshold and window setting names, defaults and parsers; limiter-module behaviour; password lockout, MFA factor lockout, newsletter recipient cooldown and Turnstile call sites; the `C-07` finding | `check:rate-limits` |
+| `frozen/static/credential-formats.json` | password hashing; 12 bearer-token kinds with generator, hash format and database `CHECK`; 2 encrypted-secret kinds; 26 credential-like migration columns classified by storage | `check:credential-formats` |
+| `frozen/static/source/awcms-impl/` | 84 implementation files (33 route handlers, 35 limiter, configuration, credential and module files, 16 migrations) at their repository paths, so every cited line resolves inside the corpus | both |
+
+Every fact cites `path`, `line` and an `anchor` that must be a substring of that
+line; the generator refuses to emit a fact otherwise, and the checker
+re-resolves all of them in the frozen copies.
+
+### `C-07`: what the code does
+
+Verdict: **confirmed** at the pinned SHA. The claim says per-IP limits alone
+could not stop repeated mail to a victim address and recipient-oriented
+cooldown semantics were required.
+
+- `POST /api/v1/newsletter/subscribe` is limited per client IP only: key
+  `newsletter:subscribe:${clientIp}` (`src/pages/api/v1/newsletter/subscribe.ts:139`),
+  `NEWSLETTER_RATE_LIMIT_MAX` default 5 per `NEWSLETTER_RATE_LIMIT_WINDOW_SEC`
+  default 300. No limiter site in the tree has a recipient dimension.
+- A separate recipient-oriented cooldown is enforced in the upsert itself
+  (`src/modules/newsletter/application/subscriber-directory.ts:153-179`): on
+  `ON CONFLICT (tenant_id, email_normalized) DO UPDATE` a confirmation is
+  re-issued only if `confirmation_sent_at IS NULL` or older than
+  `make_interval(secs => confirmationCooldownSeconds)`. The value is
+  `NEWSLETTER_CONFIRMATION_COOLDOWN_SEC`, default 900, parsed by
+  `parsePositiveIntSetting` (`subscribe.ts:89`, passed at `subscribe.ts:201`),
+  and the conflict key is the unique index in `sql/139` line 101.
+- A refused re-send returns the same neutral body as every other branch
+  (`subscribe.ts:96`), so the cooldown is not an enumeration oracle.
+- The cooldown covers the confirmation e-mail of `subscribe` only. The
+  `confirm` and `unsubscribe` endpoints are per-IP only. `POST
+  /api/v1/auth/password/forgot` is limited by IP, tenant header and scope with
+  no recipient dimension, and a word search of `password-reset.ts` for
+  cooldown, throttle, resend and recently finds nothing. That is not proof that
+  no other control exists there; the artifact states it as a search result.
+
+The checker recomputes the verdict from the recorded limiter dimensions and the
+cited SQL lines (predicate inside the `ON CONFLICT` statement, setting name and
+default). It does not edit the `C-07` register row, which belongs to the
+orchestrator.
+
+### What the inventories show
+
+- Rate-limit settings reach the limiter through five parsers or literals. Four public auth
+  endpoints (`password/forgot`, `password/reset`, `register`, `sso/{providerKey}/start`)
+  use a bare `Number(process.env.X ?? default)` with no validation, so a
+  non-numeric value yields `NaN` (and an empty one `0`); the others fall back to
+  the default on an invalid value. `AUTH_SOURCE_RATE_LIMIT_*` uses its own
+  `parseInt` ceiling parser.
+- `checkAuthRateLimit` always checks a shared per-client-IP bucket first, then a
+  per-route bucket keyed by client IP, tenant and scope. In the 13 tenant-keyed
+  sites the tenant value is read from the request (`x-awcms-tenant-id`, a
+  cookie, a query parameter or the body) before any lookup, so only the source
+  bucket cannot be chosen by the caller.
+- The shared limiter fails open when Redis is configured but a command fails;
+  without Redis it counts in a per-process `Map` (50 000 bucket cap).
+- Passwords: Argon2id through `Bun.password` with no options, so the
+  parameters are the runtime defaults, stated in a source comment and visible
+  in the PHC prefix of a constant dummy hash: v19, m 65536 KiB, t 2, p 1. They
+  are stored in `awcms_identities.password_hash` (`NOT NULL`) and
+  `awcms_principals.password_hash` (nullable until a first login promotes it).
+  No code path reads another hash format and none rehashes on login.
+- Session tokens are 32 random bytes in base64url; only `sha256:<hex>` is
+  stored (`awcms_sessions.token_hash`, no database `CHECK`). Machine credentials
+  are `awcmsm_<tenant uuid hex>_<43 chars>`, stored as `mc-sha256:<hex>` with a
+  database `CHECK` that matches the prefix the code writes. Six hash namespaces
+  that route a bearer are pairwise distinct. The newsletter token hash has no
+  prefix at all.
+- Three columns are plaintext candidates: `awcms_oidc_auth_requests.nonce` and
+  `code_verifier` (the migration says PLAINTEXT and why) and
+  `awcms_push_subscriptions.auth_secret` (Web Push key material, with no comment
+  saying it is intentionally unencrypted).
+
+### Verification performed for this follow-up
+
+- Generator run twice against the pinned checkouts: `diff -ru` empty. The 20
+  committed static files (excluding `manifest.json` and `manifest.sha256`,
+  which change because they list the new files) are byte-identical to the
+  generator output.
+- `tools/vg01_check_generated.sh` on the generated tree (post-freeze assembly,
+  `pendingArtifacts` emptied): 19 checks pass; also passes with the artifacts
+  present and still listed pending (the freeze job state).
+- `bash tools/vg01_verify_frozen.sh contracts/legacy/awcms` passes against the
+  committed corpus, reporting both artifacts as pending notes.
+- Corrupted copies are rejected by the intended validator: a changed default, a
+  flipped `C-07` verdict, a deleted cited handler, a dropped call site, a
+  reclassified dimension, a moved line, the cooldown setting repointed at the
+  per-IP variable, the cooldown predicate edited out of the frozen SQL, a
+  changed Argon2 cost, a hash prefix that disagrees with the database `CHECK`,
+  a dropped column, a PHC string carrying salt and digest, a digest-like hex
+  run, the PLAINTEXT comment edited out of a migration, a changed cipher, an
+  uncited extra file in the frozen tree, a fact citing the wrong line, and an
+  absent artifact with an empty pending list.
+- Unit tests of both tools pass (`rustc --edition 2024 -D warnings --test`).
+
+### Findings outside this change
+
+- `contracts/legacy/awcms/manifest.json` still marks `routes-auth-ownership`,
+  `architectural-gates`, `representative-behavior-fixtures` and the vector
+  citations as pending the freeze although the gate, route and behaviour
+  artifacts are frozen; that register is not corrected here.
+- The frozen `login-policy.ts` copy contains the constant dummy Argon2id hash
+  that AWCMS publishes on purpose (its comment says it guards no account). It
+  is a byte copy of the source and is not repeated in either artifact; a secret
+  scanner pointed at the corpus may still flag it.
+- `bash tools/vg01_verify_frozen.sh` should list `rate-limits.json` and
+  `credential-formats.json` in its `required` array once they are frozen; that
+  edit belongs with the freeze pull request.
+- `config:validate` (named in the AWCMS source comments) was not read here, so
+  whether it rejects a malformed value of the four unvalidated settings at
+  startup is not known.
