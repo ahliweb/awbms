@@ -140,6 +140,8 @@ jobs:
           mkdir -p "$verify_root"
           cp -a "$artifact/frozen" "$verify_root/frozen"
           cp -a contracts/legacy/awcms/authorization "$verify_root/authorization"
+          # The corpus checker also reads the manifest and the fixture-usage map.
+          cp contracts/legacy/awcms/manifest.json contracts/legacy/awcms/fixture-usage.json "$verify_root/"
           bash tools/vg01_verify_frozen.sh "$verify_root"
 
           # Digest manifest of the whole tree, kept outside the tree itself.
