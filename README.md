@@ -67,6 +67,14 @@ Only `crates/verification` exists so far; the module and app layout is still pro
 | Cut a release | [`docs/versioning/VERSIONING.md`](docs/versioning/VERSIONING.md) |
 | See every document | [`docs/README.md`](docs/README.md) |
 
+
+## Research notes (not approved product scope)
+
+- [Fuchsia/Zircon interoperability and Rust portability, 2026-11-23](docs/research/fuchsia-zircon-awbms-portability-readiness-2026-11-23.md) — an external device/edge option; no evidence AWBMS runs on Fuchsia or Zircon.
+- [Blockchain business and crypto-asset readiness, 2026-11-23](docs/research/blockchain-crypto-business-backend-readiness-2026-11-23.md) — off-chain backend and external-chain integration research; no blockchain node, crypto wallet, signing, or licensed exchange is implemented.
+
+These research records do not alter the existing architecture decisions, Stage 1 gates, PostgreSQL/Linux target, or the prohibition on product code before Gate 9.
+
 ## Checks
 
 ```bash
