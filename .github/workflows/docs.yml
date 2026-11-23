@@ -29,6 +29,9 @@ jobs:
       - name: Run the documentation gate
         run: scripts/check-docs.sh
 
+      - name: Check workflow permission boundaries
+        run: scripts/check-workflow-permissions.sh
+
   changeset-present:
     name: Changeset present
     runs-on: ubuntu-latest
