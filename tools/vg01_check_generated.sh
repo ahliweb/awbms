@@ -39,7 +39,9 @@ cp -a "$GENERATED/." "$VERIFY_ROOT/frozen/static/"
 
 # The freeze pull request empties pendingArtifacts; verify that end state.
 awk '
-  /"pendingArtifacts": \[/ { print "  \"pendingArtifacts\": [],"; skipping = 1; next }
+  # A one-line array ("pendingArtifacts": [...]) is replaced without skipping;
+  # only a multi-line array needs its following lines dropped.
+  /"pendingArtifacts": \[/ { print "  \"pendingArtifacts\": [],"; if ($0 !~ /\]/) skipping = 1; next }
   skipping == 1 { if ($0 ~ /^  \],?$/) { skipping = 0 } ; next }
   { print }
 ' "$CORPUS/fixture-usage.json" > "$VERIFY_ROOT/fixture-usage.json"
