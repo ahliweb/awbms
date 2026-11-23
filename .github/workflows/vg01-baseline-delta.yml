@@ -1,0 +1,65 @@
+name: VG-01 baseline delta
+
+# Weekly, read-only report of how far the observed upstream AWCMS / AWCMS-Astro
+# heads have moved from the frozen VG-01 baseline (contracts/legacy/awcms/frozen).
+# It classifies the movement and fails the job (alert) when contract, schema,
+# security or consumer-surface paths changed. It never refreshes the baseline:
+# a refresh needs an explicit decision, provenance update, regenerated hashes,
+# parity review and affected-test execution.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      awcms_head:
+        description: "Observed AWCMS ref or SHA (default: main)"
+        required: false
+        default: main
+      astro_head:
+        description: "Observed AWCMS-Astro ref or SHA (default: main)"
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AWCMS_HEAD: ${{ inputs.awcms_head || 'main' }}
+      ASTRO_HEAD: ${{ inputs.astro_head || 'main' }}
+    steps:
+      - name: Checkout AWBMS without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Compute baseline delta
+        run: |
+          bash tools/vg01_baseline_delta.sh \
+            --out "$RUNNER_TEMP/vg01-baseline-delta" \
+            --awcms-head "$AWCMS_HEAD" \
+            --astro-head "$ASTRO_HEAD"
+
+      - name: Publish report to the job summary
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/vg01-baseline-delta/baseline-delta.md" ]]; then
+            cat "$RUNNER_TEMP/vg01-baseline-delta/baseline-delta.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vg01-baseline-delta
+          path: ${{ runner.temp }}/vg01-baseline-delta/
+          if-no-files-found: ignore
+          retention-days: 90
