@@ -12,6 +12,14 @@ trusted.
 | [AWBMS Rust Architecture Validation](architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md) | Conditionally approved | The binding architecture decisions and their registers. Start at §0. |
 | [Architecture index](architecture/README.md) | Current | Navigation and reading order for the above. |
 
+
+### Research (non-binding)
+
+| Document | Status | Purpose |
+|---|---|---|
+| [Fuchsia/Zircon portability readiness](research/fuchsia-zircon-awbms-portability-readiness-2026-11-23.md) | Research only · 2026-11-23 | Rust target/SDK support, Linux/API ownership, trust boundaries and isolated PoC gates; not an accepted ADR |
+| [Blockchain & crypto business backend readiness](research/blockchain-crypto-business-backend-readiness-2026-11-23.md) | Research only · 2026-11-23 | Read-only chain integration, provenance, custody/legal classification, OJK/BI limits and deferred operating roles |
+
 ### Decisions
 
 | Document | Status |
