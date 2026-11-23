@@ -16,6 +16,8 @@ required=(
   "$STATIC/gates.json"
   "$STATIC/routes.json"
   "$STATIC/behaviour-fixtures.json"
+  "$STATIC/rate-limits.json"
+  "$STATIC/credential-formats.json"
   "$STATIC/source/awcms-public-api.openapi.yaml"
   "$STATIC/source/awcms-domain-events.asyncapi.yaml"
   "$LIVE/manifest.sha256"
