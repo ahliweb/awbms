@@ -6,8 +6,8 @@ stage.
 | | |
 |---|---|
 | Version | see [`VERSION`](VERSION) · [`CHANGELOG.md`](CHANGELOG.md) |
-| Stage | pre-Blueprint · conditionally approved to begin Stage 1 |
-| Repository state | Stage 1 in progress — Blueprint, frozen AWCMS inventory, and a Rust verification spike |
+| Stage | Stage 1 (Master Blueprint) signed off 2026-11-23 · Stage 2 (PRD) next · implementation waits for gate 9 |
+| Repository state | Approved Blueprint, frozen AWCMS inventory (`VG-01` PASS), and a Rust verification spike |
 | Production status | **NOT PRODUCTION READY** — no production deployment exists; see [`SECURITY.md`](SECURITY.md) |
 
 ## What this repository is right now

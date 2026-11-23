@@ -9,9 +9,9 @@ trusted.
 
 | Document | Status | Purpose |
 |---|---|---|
-| [AWBMS Rust Architecture Validation](architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md) | Conditionally approved | The binding architecture decisions and their registers. Start at §0. |
+| [AWBMS Rust Architecture Validation](architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md) | Approved 2026-11-23 | The binding architecture decisions and their registers. Start at §0. |
 | [Architecture index](architecture/README.md) | Current | Navigation and reading order for the above. |
-| [Master Blueprint](architecture/AWBMS-MASTER-BLUEPRINT.md) | Stage 1 in progress | Stage 1 formalisation of the validated architecture. |
+| [Master Blueprint](architecture/AWBMS-MASTER-BLUEPRINT.md) | Stage 1 signed off | Stage 1 formalisation of the validated architecture. |
 | [Stage 1 gate register](architecture/AWBMS-STAGE-1-GATES.md) | Authoritative status | Per-gate status, backed by [`gates.json`](architecture/gates.json). |
 | [Pre-production evidence specification](architecture/AWBMS-PRE-PRODUCTION-EVIDENCE.md) | Specification only | CI invariant gates and `VG-05`/`VG-09`/`VG-12` evidence shape. |
 
@@ -41,6 +41,7 @@ trusted.
 | [ADR-0005 — License AWBMS under MIT and enforce a dependency licence allow-list](adr/0005-licence-mit-and-dependency-licence-allow-list.md) | Accepted |
 | [ADR-0006 — Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09](adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accepted |
 | [ADR-0007 — Keep the VG-01 legacy baseline pinned for Stage 1](adr/0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Accepted |
+| [ADR-0008 — Close OD-03, OD-05 and OD-06, resolve the assumption register, and sign off Stage 1](adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) | Accepted |
 | [ADR template](adr/TEMPLATE.md) | — |
 
 ### Versioning
@@ -96,7 +97,6 @@ These are absences, recorded so that nobody mistakes them for oversights.
 | No threat model, privacy analysis, ERD, RBAC/ABAC matrix, or SLOs | Master Blueprint, §50 steps 2–3 and 5–8 | §49.2, `OD-06` |
 | No AWBMS application module — the workspace holds only `crates/verification` | Blueprint sign-off, §51 step 10 | `VG-02` |
 | No performance baseline for AWBMS or AWCMS (acceptance policy decided: no-regression, ADR-0006) | benchmark corpus, §23.1 | `VG-09`, `OD-06` |
-| No approver named on the architecture validation | an owner accepting the conditional approval | Appendix F |
 
 Licensing is decided by [ADR-0005](adr/0005-licence-mit-and-dependency-licence-allow-list.md): AWBMS is MIT
 ([`LICENSE`](../LICENSE)), and dependencies are held to the allow-list in `deny.toml`, enforced in CI.
@@ -109,5 +109,5 @@ now exist. `docs/security/` holds the supply-chain policy; the rest of it is a p
 
 The [engineering lifecycle in
 §50](architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md#50-mandatory-engineering-lifecycle)
-lists eighteen stages (product development flow v2.0.0, [`ADR-0004`](adr/0004-adopt-product-development-flow-v2.md)). Stage 1 — the Master Blueprint — is in progress (issue #1). Its
+lists eighteen stages (product development flow v2.0.0, [`ADR-0004`](adr/0004-adopt-product-development-flow-v2.md)). Stage 1 — the Master Blueprint — was signed off on 2026-11-23 ([ADR-0008](adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md)); Stage 2 (PRD) is next. Its
 required contents are in §49.2, and its entry conditions in §49.1.
