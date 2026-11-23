@@ -4,7 +4,7 @@
 - **Version:** v1.0.0
 - **Updated:** 2026-11-23
 - **Status:** RESEARCH / PROPOSED only; no approval to handle crypto assets, hold keys, launch a chain, operate an exchange or deploy a node.
-- **Evidence snapshot:** AWBMS \`main\` at \`e6bb5638e0628418079b1c1d6fcf0a123c5bb4cc\`; primary official standards/regulator documentation reviewed 2026-11-23.
+- **Evidence snapshot:** AWBMS `main` at `e6bb5638e0628418079b1c1d6fcf0a123c5bb4cc`; primary official standards/regulator documentation reviewed 2026-11-23.
 - **Document Changeset:** Assess AWBMS as an independent Rust-native backend for business blockchain integration and regulated crypto-asset infrastructure, with separate custody/legal gates.
 - **Boundary:** no product implementation before its 18-step lifecycle/DoR; no transfer of AWBMS ownership, existing decisions or gates.
 
@@ -12,7 +12,7 @@
 
 **[R] Prefer an off-chain authoritative business backend on AWBMS/Linux/PostgreSQL, optionally connected to external permissioned or public chains through typed adapters.** Do not build a new chain, validator, trading engine, wallet custodian or token launch inside AWBMS's core Stage 1.
 
-[**F, repository**] AWBMS is still specification + verification spike, not a production backend. \`Cargo.toml\` specifies Rust 2024/1.98.0, Tokio/Axum/Tower/SQLx, PostgreSQL and a narrow FORCE RLS test. No crypto custody, on-chain RPC adapters, blockchain consensus, chain indexer, smart contracts, wallet infrastructure or domain-specific financial ledger were found in inspected implementation paths/search. Business logic, network security, accounting, audits and recovery remain planned.
+[**F, repository**] AWBMS is still specification + verification spike, not a production backend. `Cargo.toml` specifies Rust 2024/1.98.0, Tokio/Axum/Tower/SQLx, PostgreSQL and a narrow FORCE RLS test. No crypto custody, on-chain RPC adapters, blockchain consensus, chain indexer, smart contracts, wallet infrastructure or domain-specific financial ledger were found in inspected implementation paths/search. Business logic, network security, accounting, audits and recovery remain planned.
 
 **Do not conflate these products:**
 
@@ -35,7 +35,7 @@
 - PostgreSQL with FORCE RLS is suitable for customer/business metadata, balances **only if a separate correct accounting model is designed**. RLS alone cannot prove double-entry consistency, nonnegative balances, consensus or fiat/crypto reconciliation.
 - SQLx/Postgres and outbox support reliable state orchestration but transactions cannot atomically commit with a public blockchain. Design saga/settlement and compensation, no claim of distributed ACID across chains.
 - OpenAPI/AsyncAPI (already proposed by existing [issue #23](https://github.com/ahliweb/awbms/issues/23)) should specify typed requests and outbox transitions; avoid a duplicate generic contract issue.
-- Hardware signing, HSM/MPC, wallet recovery, exchange licensing, fraud controls and cross-chain consensus are **not implemented** by \`crates/verification\`.
+- Hardware signing, HSM/MPC, wallet recovery, exchange licensing, fraud controls and cross-chain consensus are **not implemented** by `crates/verification`.
 
 Evidence basis: [AWBMS README](../../README.md), [architecture validation](../architecture/AWBMS-RUST-ARCHITECTURE-VALIDATION.md), [Stage-1 gates](../architecture/AWBMS-STAGE-1-GATES.md).
 
@@ -70,8 +70,8 @@ Mandatory distinctions before any user-facing service:
 - **Reconciled**: node data and authoritative account/transaction records agree; exceptions queued for human review.
 
 Operational invariants:
-1. Chain-specific idempotency, replay protection, \`chainId\`, \`nonce\`, signed-payload digest, sequence and concurrency lock; sign exactly the reviewed payload. Address validation must include network/token and anti-address-poisoning policies.
-2. A \`200 OK\` from RPC, broadcast receipt, or event \`observed\` is never evidence of finality. Two independent RPC sources where justified; bounded reorg window and deterministic reindexing.
+1. Chain-specific idempotency, replay protection, `chainId`, `nonce`, signed-payload digest, sequence and concurrency lock; sign exactly the reviewed payload. Address validation must include network/token and anti-address-poisoning policies.
+2. A `200 OK` from RPC, broadcast receipt, or event `observed` is never evidence of finality. Two independent RPC sources where justified; bounded reorg window and deterministic reindexing.
 3. Integer base units only; no binary floating point for money/coins. Decimal representation must have asset-specific scale, rounding, fee/currency rule and explicit handling of dust.
 4. Distinguish financial accounting ledger from blockchain ledger and operational audit log. Double-entry, segregation, reconciliation, reserve/treasury controls need independent domain specification and audit.
 5. No secret seed phrase, private key, PIN, wallet recovery material or signing key is delivered to an AI agent, browser bundle, log, prompt, CI or ordinary business database.
@@ -157,6 +157,14 @@ Suggested acceptance tests:
 8. Backup/restore rebuilds indexer and reconciles against independent network state.
 
 **Boundaries and ownership:** Stage 1 #1, documentation/evidence #7, security/quality #21/#22, contract-first #23. Do not duplicate these foundation issues; crypto-specific design belongs to the consumer product after Blueprint and Gate 9, not to generic AWBMS before readiness.
+
+## Related follow-on research issues
+
+- [#32](https://github.com/ahliweb/awbms/issues/32): documentation and review.
+- [#35](https://github.com/ahliweb/awbms/issues/35): Indonesian regulatory classification, business and crypto scope.
+- [#36](https://github.com/ahliweb/awbms/issues/36): synthetic read-only RPC/finality/reorg spec and spike plan.
+- [#37](https://github.com/ahliweb/awbms/issues/37): business provenance/hash anchoring versus permissioned chain.
+- [#38](https://github.com/ahliweb/awbms/issues/38): custody, signing, financial ledger and operational-risk boundary.
 
 ## 10. References and status of evidence
 
