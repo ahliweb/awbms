@@ -4,7 +4,7 @@
 |---|---|
 | Project | AWBMS — AhliWeb Backend Management System |
 | Repository | `ahliweb/awbms` |
-| Specification version | v0.3.0 |
+| Specification version | v0.4.0 |
 | Status | Architecture validation — **approved by the repository owner, 2026-11-23**; Stage 1 signed off ([ADR-0008](../adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md), [Appendix F](#appendix-f--approval-record)) |
 | Original validation date | 2026-08-29 |
 | Last revision | 2026-08-31 (register completion and defect correction; no architectural decision reversed) |
