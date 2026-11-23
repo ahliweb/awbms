@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted |
+| Status | Accepted; `PD-12` superseded by [ADR-0010](0010-data-subject-request-deadlines-follow-uu-pdp.md) |
 | Date | 2026-11-23 |
 | Deciders | Repository owner. Recorded approval, 2026-11-23: *"Ya, setuju semua dg riset sesuai konsep rencana"* ("Yes, I agree to all of it, in line with the research and the planned concept"), given in reply to the list of owner decisions `PD-01`–`PD-22` in the draft PRD and the question whether to accept every proposal as written. The proposals were drafted by the orchestrating agent's sub-agents from the cited evidence, checked by the orchestrator, and accepted by that statement |
 | Supersedes | none |
-| Superseded by | none |
+| Superseded by | [ADR-0010](0010-data-subject-request-deadlines-follow-uu-pdp.md) for `PD-12` only |
 | Related registers | `OD-06` (values refined, not reopened); `OD-07` (owner assigned, still open); `OD-03`; `VG-05`, `VG-09`, `VG-12`, `VG-14` |
 
 ## Context

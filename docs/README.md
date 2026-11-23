@@ -49,7 +49,8 @@ trusted.
 | [ADR-0006 — Accept the Master Blueprint dispositions of OD-01, OD-02, OD-04 and OD-09](adr/0006-accept-blueprint-dispositions-od-01-02-04-09.md) | Accepted |
 | [ADR-0007 — Keep the VG-01 legacy baseline pinned for Stage 1](adr/0007-keep-vg-01-legacy-baseline-pinned-for-stage-1.md) | Accepted |
 | [ADR-0008 — Close OD-03, OD-05 and OD-06, resolve the assumption register, and sign off Stage 1](adr/0008-close-od-03-05-06-resolve-assumptions-sign-off-stage-1.md) | Accepted |
-| [ADR-0009 — Accept the Stage 2 PRD and its owner decisions PD-01 to PD-22](adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md) | Accepted |
+| [ADR-0009 — Accept the Stage 2 PRD and its owner decisions PD-01 to PD-22](adr/0009-accept-stage-2-prd-owner-decisions-pd-01-22.md) | Accepted; `PD-12` superseded by ADR-0010 |
+| [ADR-0010 — Data-subject request deadlines follow UU PDP](adr/0010-data-subject-request-deadlines-follow-uu-pdp.md) | Accepted |
 | [ADR template](adr/TEMPLATE.md) | — |
 
 ### Versioning
