@@ -1,20 +1,33 @@
 name: Freeze VG-01 legacy evidence
 
+# Two trust boundaries (issue #7, P0.1):
+#   generate: runs pinned third-party code (bun install, migrations, tools).
+#             Read-only token. Produces an artifact + sha256 manifest + attestation.
+#   publish:  holds the write token. Runs NO install/build/migration/repository
+#             script. Verifies the artifact, replaces only
+#             contracts/legacy/awcms/frozen/** and opens a pull request. Gated by
+#             the vg01-publish GitHub Environment (manual approval).
+# Procedure: docs/architecture/evidence/VG-01-publication-procedure.md
+
 on:
-  push:
-    branches: [chore/3-vg01-legacy-inventory]
-    paths:
-      - .github/workflows/vg01-freeze.yml
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: vg01-freeze
+  cancel-in-progress: false
 
 jobs:
-  freeze:
+  generate:
+    name: Generate and verify VG-01 evidence
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
-      contents: write
+      contents: read
+      id-token: write
+      attestations: write
 
     env:
       POSTGRES_USER: postgres
@@ -40,11 +53,11 @@ jobs:
           --health-retries 10
 
     steps:
-      - name: Checkout AWBMS write target
+      - name: Checkout AWBMS without persistent credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: chore/3-vg01-legacy-inventory
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Install pinned Rust toolchain
         run: |
@@ -97,16 +110,18 @@ jobs:
             "$TARGET_ADMIN_DATABASE_URL" \
             /tmp/vg01-live
 
-      - name: Freeze reviewed corpus under contracts only
+      - name: Assemble frozen tree and digest manifest
         env:
           FREEZE_SOURCE_SHA: ${{ github.sha }}
           FREEZE_RUN_ID: ${{ github.run_id }}
         run: |
-          rm -rf contracts/legacy/awcms/frozen
-          mkdir -p contracts/legacy/awcms/frozen/static contracts/legacy/awcms/frozen/live
-          cp -a /tmp/vg01-static-a/. contracts/legacy/awcms/frozen/static/
-          cp -a /tmp/vg01-live/. contracts/legacy/awcms/frozen/live/
-          cat > contracts/legacy/awcms/frozen/provenance.json <<JSON
+          set -euo pipefail
+          artifact="$RUNNER_TEMP/vg01-artifact"
+          rm -rf "$artifact"
+          mkdir -p "$artifact/frozen/static" "$artifact/frozen/live"
+          cp -a /tmp/vg01-static-a/. "$artifact/frozen/static/"
+          cp -a /tmp/vg01-live/. "$artifact/frozen/live/"
+          cat > "$artifact/frozen/provenance.json" <<JSON
           {
             "gate": "VG-01",
             "freezeSourceAwbmsCommit": "$FREEZE_SOURCE_SHA",
@@ -118,22 +133,115 @@ jobs:
             "rust": "1.98.0"
           }
           JSON
-          rm -rf .legacy
-          bash tools/vg01_verify_frozen.sh contracts/legacy/awcms
 
-          git add contracts/legacy/awcms/frozen
-          changed=$(git diff --cached --name-only)
-          if [[ -z "$changed" ]]; then
-            echo "Frozen corpus already matches regenerated evidence"
-            exit 0
-          fi
-          if echo "$changed" | grep -Ev '^contracts/legacy/awcms/frozen/' | grep -q .; then
-            echo "Refusing write outside frozen VG-01 evidence path" >&2
-            echo "$changed" >&2
+          # Verify the assembled tree with the repository verifier before upload.
+          verify_root="$RUNNER_TEMP/vg01-verify-root"
+          rm -rf "$verify_root"
+          mkdir -p "$verify_root"
+          cp -a "$artifact/frozen" "$verify_root/frozen"
+          cp -a contracts/legacy/awcms/authorization "$verify_root/authorization"
+          bash tools/vg01_verify_frozen.sh "$verify_root"
+
+          # Digest manifest of the whole tree, kept outside the tree itself.
+          (
+            cd "$artifact"
+            find frozen -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > frozen.sha256
+            sha256sum -c frozen.sha256
+          )
+
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vg01-frozen-evidence
+          path: ${{ runner.temp }}/vg01-artifact
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attest the digest manifest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/vg01-artifact/frozen.sha256
+
+  publish:
+    name: Publish VG-01 evidence pull request
+    needs: generate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Named Environment with required reviewers = manual approval for the write path.
+    environment: vg01-publish
+    permissions:
+      contents: write
+      pull-requests: write
+
+    # No dependency install, build, migration, or repository script runs here.
+    steps:
+      - name: Checkout AWBMS
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+
+      - name: Download evidence artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: vg01-frozen-evidence
+          path: ${{ runner.temp }}/vg01-artifact
+
+      - name: Verify attestation and digest manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/vg01-artifact"
+          gh attestation verify frozen.sha256 --repo "$GITHUB_REPOSITORY"
+          sha256sum -c frozen.sha256
+          if find frozen ! -type f ! -type d | grep -q .; then
+            echo "Artifact contains non-regular entries" >&2
             exit 1
           fi
+          # Every file present must be listed in the manifest, and vice versa.
+          diff <(find frozen -type f | LC_ALL=C sort) \
+               <(awk '{ sub(/^[^ ]+  /, ""); print }' frozen.sha256 | LC_ALL=C sort)
 
+      - name: Replace frozen evidence and fail closed on other paths
+        run: |
+          set -euo pipefail
+          prefix="contracts/legacy/awcms/frozen/"
+          rm -rf "${prefix%/}"
+          cp -a "$RUNNER_TEMP/vg01-artifact/frozen" "${prefix%/}"
+
+          status="$(git status --porcelain --untracked-files=all)"
+          if [[ -z "$status" ]]; then
+            echo "Frozen corpus already matches regenerated evidence"
+            echo "publish_needed=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          outside="$(printf '%s\n' "$status" | cut -c4- | { grep -vF "$prefix" || true; })"
+          if [[ -n "$outside" ]]; then
+            echo "Refusing change outside ${prefix}" >&2
+            printf '%s\n' "$outside" >&2
+            exit 1
+          fi
+          echo "publish_needed=true" >> "$GITHUB_ENV"
+
+      - name: Commit to a new branch and open a pull request
+        if: env.publish_needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          branch="ci/vg01-freeze-${RUN_ID}-${RUN_ATTEMPT}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add contracts/legacy/awcms/frozen
           git commit -m "chore(vg-01): freeze legacy evidence corpus (#3)"
-          git push origin HEAD:chore/3-vg01-legacy-inventory
+          git push origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "chore(vg-01): freeze legacy evidence corpus (#3)" \
+            --body "Automated VG-01 evidence publication. Source commit ${SOURCE_SHA}, workflow run ${RUN_ID}. The digest manifest was attestation-verified and re-checked; only contracts/legacy/awcms/frozen/** changed. Review the diff before merging. Part of #3."
