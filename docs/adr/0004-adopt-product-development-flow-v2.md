@@ -15,8 +15,8 @@ Validation §50 lists an eighteen-step lifecycle with UX/UI at step 8, after the
 ERD, the RBAC/ABAC/RLS matrix and the OpenAPI contract, and treats step 11
 (implementation) as one undivided step.
 
-The owner's cross-portfolio flow, maintained in `ahliweb/personal-coding`
-(`docs/alur-pengembangan-produk.md`, decision log entry **DL-033**), was
+The owner's cross-portfolio flow, maintained in the internal cross-portfolio
+standard (decision log entry **DL-033**), was
 revised to **v2.0.0** on 2026-10-30:
 
 - UX/UI is visualised and usability-tested as a prototype **before** the data
@@ -99,5 +99,5 @@ cites RBAC/ABAC/RLS as step 6.
 
 ## Revisit when
 
-`ahliweb/personal-coding` publishes a flow version after v2.0.0, or AWBMS
+The internal cross-portfolio standard publishes a flow version after v2.0.0, or AWBMS
 acquires its first frontend of its own.
