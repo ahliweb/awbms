@@ -36,7 +36,7 @@ trusted.
 | [Hash anchoring vs permissioned ledger](research/hash-anchoring-vs-permissioned-ledger-2026-11-23.md) | Research only · 2026-11-23 | `#37`: signed audit/anchoring vs Fabric/EVM, business trigger and no-go |
 | [Crypto custody, signing and ledger safety boundary](research/crypto-custody-signing-ledger-safety-boundary-2026-11-23.md) | Research only · 2026-11-23 | `#38`: reasons not to launch custody; three-model reconciliation invariants |
 
-| [Smart School CBT capacity and online payment readiness](research/smart-school-cbt-capacity-online-payment-2026-11-28.md) | Research only · 2026-11-28 | #undefined: 10k concurrent CBT workload, proposed VG-09 evidence and online-only provider guard; no scope or gate approval |
+| [Smart School CBT capacity and online payment readiness](research/smart-school-cbt-capacity-online-payment-2026-11-28.md) | Research only · 2026-11-28 | #67: 10k concurrent CBT workload, proposed VG-09 evidence and online-only provider guard; no scope or gate approval |
 
 ### Decisions
 
