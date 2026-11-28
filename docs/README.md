@@ -29,6 +29,7 @@ trusted.
 |---|---|---|
 | [Fuchsia/Zircon portability readiness](research/fuchsia-zircon-awbms-portability-readiness-2026-11-23.md) | Research only · 2026-11-23 | Rust target/SDK support, Linux/API ownership, trust boundaries and isolated PoC gates; not an accepted ADR |
 | [Blockchain & crypto business backend readiness](research/blockchain-crypto-business-backend-readiness-2026-11-23.md) | Research only · 2026-11-23 | Read-only chain integration, provenance, custody/legal classification, OJK/BI limits and deferred operating roles |
+| [AI-assisted design and specification evidence](research/ai-assisted-design-evidence-2026-11-28.md) | Research only · proposed · 2026-11-28 | `#23`: evidence review and proposed contract/parity evidence pilot; references checked at takeover, four marked not verified |
 | [Fuchsia Rust SDK and dependency portability](research/fuchsia-rust-sdk-dependency-portability-2026-11-23.md) | Research only · 2026-11-23 | `#33`: per-crate Fuchsia disposition; rustc Tier 2 vs end-developer policy; NO-GO for native Rust today |
 | [Fuchsia FEMU/HTTPS spike plan](research/fuchsia-femu-https-spike-plan-2026-11-23.md) | Plan only · not executed | `#34`: isolated spike plan, blocked on `#33` and owner authorisation |
 | [Blockchain business models vs Indonesian regulation](research/blockchain-business-models-indonesia-regulation-2026-11-23.md) | Research only · counsel review required | `#35`: activity classification matrix with a citation verification log |
