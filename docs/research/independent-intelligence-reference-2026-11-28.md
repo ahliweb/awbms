@@ -1,9 +1,9 @@
 # Independent intelligence capability research
 
 ## Metadata
-- Version: v1.1.0
+- Version: v1.2.0
 - Last updated: 2026-11-28
-- Changeset: PHYLEX follow-up, license and professional evidence validation; original concept only.
+- Changeset: independent reconstruction, original bounded design and evidence.
 - Status: research/reference only; no product code, no approved dependency, no Gate 9/15 decision.
 - Tracker: #70
 - Evidence: main branch blob snapshots AGENTS 5f2e322579f7; README 24d00f6b6cde (not HEAD commit). Full code, migration, issue status and CI audit still pending.
@@ -43,6 +43,15 @@ Explicit asset scope and authorization, expiry/revocation/recheck, tenant isolat
 ### Local work
 #70: research workload design only; compare equivalent AWCMS security finding/evidence ingestion and bounded event workload with synthetic data. Measure throughput, p95/p99, isolation, resource usage, RPO/RTO and recovery, parity and cost. No scanner, SIEM, Wazuh or agent runtime in AWBMS, no product code, dependency admission or authority transfer. Rust spike does not establish readiness.
 
+## Independent reconstruction decision — 2026-11-28 (v1.2.0)
+Owner direction: implement original bounded capabilities; do not use unapproved testssl.sh (GPL-2.0 https://github.com/testssl/testssl.sh), Wazuh (engine AGPL-3.0-or-later, mixed components https://github.com/wazuh/wazuh/blob/main/README.md), MVT (MVT License 1.1 https://github.com/mvt-project/mvt/blob/main/LICENSE) or proprietary PHYLEX. Supersedes previous HOLD-as-candidate for these three upstream tools in this initiative. GPL/AGPL permit commercial use subject to terms; this is an independent design decision, not avoidance of lawful obligations. No install, link, port, translation, source/structure/UI/rule/template/IOC/data copying, use as oracle or reverse engineering. Explicit informed non-coerced owner consent remains required. ZAP/Nuclei remain unapproved candidates; no dependency admission. Public concepts and independent standards only; author provenance/attestation, source register, independent requirements/reviewer, similarity and dependency/SBOM checks; version/SHA/license/notice/patent/terms/data/exit review. No restricted material in agent prompts, no formal clean-room certification. UU 28/2014 art 41 https://www.wipo.int/wipolex/en/legislation/details/15600; other IP and contracts separately reviewed.
+### Scientific and professional references
+RFC 9846 (July 2026) obsoletes 8446 https://www.rfc-editor.org/info/rfc9846/ ; BCP 195 RFC 9325 updated by 9852/10015 https://www.rfc-editor.org/info/bcp195/ ; RFC 9525 https://www.rfc-editor.org/rfc/rfc9525.html ; NIST 800-52r2 https://csrc.nist.gov/pubs/sp/800/52/r2/final . Use approved TLS runtime APIs, not new crypto. Observed TLS1.2 not compliance; unknown not pass. Denning 1987 https://doi.org/10.1109/TSE.1987.232894 ; NIST 800-92 https://csrc.nist.gov/pubs/sp/800/92/final (r1 draft), 800-137 https://csrc.nist.gov/pubs/sp/800/137/final ; 800-53r5 release 5.2.0 AU-6/SI-7/SI-4 https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final ; RFC 5424 https://www.rfc-editor.org/info/rfc5424/ ; OTel data model https://opentelemetry.io/docs/specs/otel/logs/data-model/ reference only. NIST 800-124r2 https://csrc.nist.gov/pubs/sp/800/124/r2/final ; 800-101r1 https://csrc.nist.gov/pubs/sp/800/101/r1/final (forensic scope boundary, not acquisition instructions). NIST SSDF 1.1 final https://csrc.nist.gov/pubs/sp/800/218/final ; 1.2 IPD not final. Existing ISO/IEC 27001/27002/27005/27017:2026/27018:2025/27701:2025/27034/15408, 20000-1, 42001, 27035/27037 and ISO 22301 controls/evidence mapping applies; no certification. UU PDP, UU ITE, PP 71/2019; purpose, consent, retention and legal review.
+Provisional capability IDs IND-01 TLS posture, IND-02 host metadata, IND-03 normalized event/correlation, IND-04 integrity evidence, IND-05 mobile posture, IND-06 risk/evidence/cases. No full SIEM/XDR or forensics parity. Local offline research spike (Node v22.16.0, no packages/network, synthetic observations) passed 19/19 tests for scope, TLS posture decision, event counts, digest comparison and consent. Bun unavailable; no actual TLS/device/DB/CI validation; this does not establish repository implementation. Reconcile CAP/REQ, explicit authorization, owner approvals, Gate 9/15, synthetic fixtures, consumer UAT, recovery. No product code, real data or deployment.
+### Local requirements and acceptance (proposed)
+IND-03/06 future workload parity research only. Rust specification/verification spike not production readiness; compare AWCMS using synthetic event/observation records, bounded windows, dedup, RLS, latency/resource/restore and cost. No scanner/agent/crypto library, no product code/authority transfer before gates.
+
 ## Changelog
+- v1.2.0 (2026-11-28): independent reconstruction replacing unapproved components; proposed local acceptance.
 - v1.1.0 (2026-11-28): PHYLEX follow-up, local acceptance and license register.
 - v1.0.0 (2026-11-28): initial research, local ownership and controls.
