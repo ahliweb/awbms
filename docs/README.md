@@ -33,6 +33,7 @@ trusted.
 | [Fuchsia FEMU/HTTPS spike plan](research/fuchsia-femu-https-spike-plan-2026-11-23.md) | Plan only · not executed | `#34`: isolated spike plan, blocked on `#33` and owner authorisation |
 | [Blockchain business models vs Indonesian regulation](research/blockchain-business-models-indonesia-regulation-2026-11-23.md) | Research only · counsel review required | `#35`: activity classification matrix with a citation verification log |
 | [Chain RPC indexer finality and reorg spec](research/chain-rpc-indexer-finality-reorg-spec-2026-11-23.md) | Spec only · not executed | `#36`: read-only EVM indexer states, cursor, reorg and fail-closed matrix |
+| [Independent intelligence capability research and IP guardrails](research/independent-intelligence-reference-2026-11-28.md) | Research only · proposed · 2026-11-28 | `#70`: original bounded capabilities from open standards, IP guardrails, candidate open-source licence register; unverifiable references marked |
 | [Hash anchoring vs permissioned ledger](research/hash-anchoring-vs-permissioned-ledger-2026-11-23.md) | Research only · 2026-11-23 | `#37`: signed audit/anchoring vs Fabric/EVM, business trigger and no-go |
 | [Crypto custody, signing and ledger safety boundary](research/crypto-custody-signing-ledger-safety-boundary-2026-11-23.md) | Research only · 2026-11-23 | `#38`: reasons not to launch custody; three-model reconciliation invariants |
 
